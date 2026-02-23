@@ -1,0 +1,144 @@
+{
+  "info": {
+    "name": "Solana Paper Trading API",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:4000" },
+    { "key": "token", "value": "" }
+  ],
+  "auth": {
+    "type": "bearer",
+    "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }]
+  },
+  "item": [
+    {
+      "name": "Health",
+      "item": [
+        {
+          "name": "Health Check",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/health"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Connect Wallet",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var data = pm.response.json();",
+                  "pm.collectionVariables.set('token', data.token);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/auth/connect",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"walletAddress\": \"11111111111111111111111111111111\"}"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Market",
+      "item": [
+        {
+          "name": "Search Tokens",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/market/search?query=SOL"
+          }
+        },
+        {
+          "name": "Get Token Info",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/market/tokens/So11111111111111111111111111111111111111112"
+          }
+        },
+        {
+          "name": "Get Chart Data",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/market/tokens/So11111111111111111111111111111111111111112/chart?range=1d"
+          }
+        },
+        {
+          "name": "Get Order Book",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/market/tokens/So11111111111111111111111111111111111111112/orderbook"
+          }
+        },
+        {
+          "name": "Get Top Tokens",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/market/top"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Trading",
+      "item": [
+        {
+          "name": "Execute Buy",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/trades",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"mint\": \"So11111111111111111111111111111111111111112\", \"amount\": 100, \"side\": \"buy\"}"
+            }
+          }
+        },
+        {
+          "name": "Execute Sell",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/trades",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"mint\": \"So11111111111111111111111111111111111111112\", \"amount\": 0.5, \"side\": \"sell\"}"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Portfolio",
+      "item": [
+        {
+          "name": "Get Portfolio",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/portfolio"
+          }
+        },
+        {
+          "name": "Get Trade History",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/portfolio/trades?limit=50&offset=0"
+          }
+        }
+      ]
+    }
+  ]
+}

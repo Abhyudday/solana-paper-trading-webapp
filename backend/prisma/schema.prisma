@@ -1,0 +1,73 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String         @id @default(cuid())
+  walletAddress String         @unique
+  email         String?
+  createdAt     DateTime       @default(now())
+  balances      PaperBalance[]
+  positions     Position[]
+  trades        Trade[]
+
+  @@index([walletAddress])
+}
+
+model PaperBalance {
+  id       String @id @default(cuid())
+  userId   String
+  currency String
+  amount   Float  @default(0)
+  user     User   @relation(fields: [userId], references: [id])
+
+  @@unique([userId, currency])
+  @@index([userId])
+}
+
+model Position {
+  id            String @id @default(cuid())
+  userId        String
+  mint          String
+  qty           Float  @default(0)
+  avgEntryPrice Float  @default(0)
+  realizedPnl   Float  @default(0)
+  user          User   @relation(fields: [userId], references: [id])
+
+  @@unique([userId, mint])
+  @@index([userId])
+  @@index([mint])
+}
+
+model Trade {
+  id        String   @id @default(cuid())
+  userId    String
+  mint      String
+  side      String
+  qty       Float
+  price     Float
+  fee       Float
+  slippage  Float
+  timestamp DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([mint])
+  @@index([timestamp])
+}
+
+model Token {
+  mint     String   @id
+  symbol   String
+  name     String
+  decimals Int      @default(9)
+  listedAt DateTime @default(now())
+
+  @@index([symbol])
+  @@index([name])
+}

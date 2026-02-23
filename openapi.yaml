@@ -1,0 +1,412 @@
+openapi: 3.0.3
+info:
+  title: Solana Paper Trading API
+  version: 1.0.0
+  description: API for simulated Solana token trading
+
+servers:
+  - url: http://localhost:4000
+    description: Local development
+
+paths:
+  /api/health:
+    get:
+      summary: Health check
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                  timestamp:
+                    type: string
+
+  /api/auth/connect:
+    post:
+      summary: Connect wallet and get JWT
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [walletAddress]
+              properties:
+                walletAddress:
+                  type: string
+                  minLength: 32
+                  maxLength: 44
+      responses:
+        "200":
+          description: Authentication successful
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  token:
+                    type: string
+                  user:
+                    $ref: "#/components/schemas/User"
+
+  /api/market/search:
+    get:
+      summary: Search tokens
+      parameters:
+        - name: query
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Search results
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  results:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/TokenSearchResult"
+
+  /api/market/tokens/{mint}:
+    get:
+      summary: Get token information
+      parameters:
+        - name: mint
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Token info
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TokenInfo"
+        "404":
+          description: Token not found
+
+  /api/market/tokens/{mint}/chart:
+    get:
+      summary: Get OHLCV chart data
+      parameters:
+        - name: mint
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: range
+          in: query
+          schema:
+            type: string
+            enum: [1d, 7d, 30d]
+            default: 1d
+      responses:
+        "200":
+          description: Chart data
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  bars:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/OHLCVBar"
+
+  /api/market/tokens/{mint}/orderbook:
+    get:
+      summary: Get simulated order book
+      parameters:
+        - name: mint
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Order book
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrderBook"
+
+  /api/market/top:
+    get:
+      summary: Get top tokens by volume
+      responses:
+        "200":
+          description: Top tokens
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  tokens:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/TokenInfo"
+
+  /api/trades:
+    post:
+      summary: Execute a paper trade
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [mint, amount, side]
+              properties:
+                mint:
+                  type: string
+                amount:
+                  type: number
+                  minimum: 0
+                side:
+                  type: string
+                  enum: [buy, sell]
+      responses:
+        "201":
+          description: Trade executed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TradeResult"
+        "400":
+          description: Bad request
+        "401":
+          description: Unauthorized
+
+  /api/portfolio:
+    get:
+      summary: Get portfolio summary
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Portfolio data
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Portfolio"
+        "401":
+          description: Unauthorized
+
+  /api/portfolio/trades:
+    get:
+      summary: Get trade history
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+      responses:
+        "200":
+          description: Trade history
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  trades:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Trade"
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+        walletAddress:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+
+    TokenSearchResult:
+      type: object
+      properties:
+        mint:
+          type: string
+        symbol:
+          type: string
+        name:
+          type: string
+        image:
+          type: string
+        price:
+          type: number
+        marketCap:
+          type: number
+
+    TokenInfo:
+      type: object
+      properties:
+        mint:
+          type: string
+        symbol:
+          type: string
+        name:
+          type: string
+        decimals:
+          type: integer
+        supply:
+          type: number
+        liquidity:
+          type: number
+        price:
+          type: number
+        marketCap:
+          type: number
+        image:
+          type: string
+        volume24h:
+          type: number
+
+    OHLCVBar:
+      type: object
+      properties:
+        time:
+          type: number
+        open:
+          type: number
+        high:
+          type: number
+        low:
+          type: number
+        close:
+          type: number
+        volume:
+          type: number
+
+    OrderBookLevel:
+      type: object
+      properties:
+        price:
+          type: number
+        qty:
+          type: number
+
+    OrderBook:
+      type: object
+      properties:
+        bids:
+          type: array
+          items:
+            $ref: "#/components/schemas/OrderBookLevel"
+        asks:
+          type: array
+          items:
+            $ref: "#/components/schemas/OrderBookLevel"
+        midPrice:
+          type: number
+        spread:
+          type: number
+
+    TradeResult:
+      type: object
+      properties:
+        tradeId:
+          type: string
+        mint:
+          type: string
+        side:
+          type: string
+          enum: [buy, sell]
+        qty:
+          type: number
+        price:
+          type: number
+        fee:
+          type: number
+        slippage:
+          type: number
+        totalCost:
+          type: number
+
+    Portfolio:
+      type: object
+      properties:
+        totalValue:
+          type: number
+        pnl24h:
+          type: number
+        overallPnl:
+          type: number
+        roi:
+          type: number
+        usdcBalance:
+          type: number
+        positions:
+          type: array
+          items:
+            $ref: "#/components/schemas/PositionWithPrice"
+
+    PositionWithPrice:
+      type: object
+      properties:
+        mint:
+          type: string
+        qty:
+          type: number
+        avgEntryPrice:
+          type: number
+        currentPrice:
+          type: number
+        unrealizedPnl:
+          type: number
+        realizedPnl:
+          type: number
+        value:
+          type: number
+
+    Trade:
+      type: object
+      properties:
+        id:
+          type: string
+        userId:
+          type: string
+        mint:
+          type: string
+        side:
+          type: string
+        qty:
+          type: number
+        price:
+          type: number
+        fee:
+          type: number
+        slippage:
+          type: number
+        timestamp:
+          type: string
+          format: date-time
