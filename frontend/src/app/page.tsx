@@ -154,6 +154,7 @@ function TokenColumn({
   filteredTokens,
   isLoading,
   isFilterLoading,
+  hasData,
   color,
   filters,
   onOpenFilter,
@@ -163,6 +164,7 @@ function TokenColumn({
   filteredTokens: FilteredTokenItem[] | undefined;
   isLoading: boolean;
   isFilterLoading: boolean;
+  hasData: boolean;
   color: string;
   filters: TokenFilterParams;
   onOpenFilter: () => void;
@@ -173,6 +175,7 @@ function TokenColumn({
   const lastTokensRef = useRef<DisplayToken[]>([]);
   const seenMintsRef = useRef<Set<string>>(new Set());
   const isFirstRenderRef = useRef(true);
+  const hasEverLoadedRef = useRef(false);
 
   const tokens = useMemo(() => {
     const raw = hasFilters && filteredTokens ? toDisplayTokens(filteredTokens) : toDisplayTokens(defaultTokens);
@@ -182,7 +185,9 @@ function TokenColumn({
   // Remember last non-empty list so columns never blank out during refetches
   if (tokens.length > 0) {
     lastTokensRef.current = tokens;
+    hasEverLoadedRef.current = true;
   }
+  if (hasData) hasEverLoadedRef.current = true;
   const displayTokens = tokens.length > 0 ? tokens : lastTokensRef.current;
 
   // Detect which tokens are new (not in the previously seen set)
@@ -201,8 +206,8 @@ function TokenColumn({
     seenMintsRef.current = new Set(displayTokens.map((t) => t.mint));
   }, [displayTokens]);
 
-  // Only show skeleton on very first load when we have never received data
-  const loading = (hasFilters ? isFilterLoading : isLoading) && lastTokensRef.current.length === 0;
+  // Show loading skeleton when we've never received data
+  const loading = !hasEverLoadedRef.current && displayTokens.length === 0;
 
   return (
     <div className="flex flex-col min-w-0">
@@ -252,10 +257,19 @@ function TokenColumn({
           ))
         ) : displayTokens.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-12 text-text-muted">
-            <svg className="w-10 h-10 mb-2 opacity-30" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-            </svg>
-            <span className="text-xs">No Data</span>
+            {(isLoading || isFilterLoading) ? (
+              <>
+                <div className="w-6 h-6 border-2 border-text-muted/30 border-t-accent-green rounded-full animate-spin mb-3" />
+                <span className="text-xs">Loading...</span>
+              </>
+            ) : (
+              <>
+                <svg className="w-10 h-10 mb-2 opacity-30" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+                <span className="text-xs">No Data</span>
+              </>
+            )}
           </div>
         ) : (
           displayTokens.map((token) => <TokenCard key={token.mint} token={token} isNew={newMints.has(token.mint)} />)
@@ -363,6 +377,7 @@ export default function LandingPage() {
           filteredTokens={filteredNew?.tokens}
           isLoading={latestLoading}
           isFilterLoading={filteredNewLoading}
+          hasData={!!latestData}
           color="bg-accent-green"
           filters={columnFilters.new}
           onOpenFilter={() => setFilterOpen("new")}
@@ -373,6 +388,7 @@ export default function LandingPage() {
           filteredTokens={filteredMigrating?.tokens}
           isLoading={graduatingLoading}
           isFilterLoading={filteredMigratingLoading}
+          hasData={!!graduatingData}
           color="bg-accent-yellow"
           filters={columnFilters.migrating}
           onOpenFilter={() => setFilterOpen("migrating")}
@@ -383,6 +399,7 @@ export default function LandingPage() {
           filteredTokens={filteredMigrated?.tokens}
           isLoading={graduatedLoading}
           isFilterLoading={filteredMigratedLoading}
+          hasData={!!graduatedData}
           color="bg-accent-blue"
           filters={columnFilters.migrated}
           onOpenFilter={() => setFilterOpen("migrated")}
