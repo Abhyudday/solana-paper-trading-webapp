@@ -74,20 +74,25 @@ function TokenCard({ token, isNew }: { token: DisplayToken; isNew?: boolean }) {
     >
       <div className="flex items-start gap-2.5">
         {/* Token Avatar */}
-        <div className="flex-shrink-0">
+        <div className="flex-shrink-0 relative h-10 w-10">
           {token.image ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={token.image}
-              alt={token.symbol}
-              className="h-10 w-10 rounded-full object-cover bg-bg-tertiary ring-1 ring-border"
-              onError={(e) => {
-                (e.target as HTMLImageElement).style.display = "none";
-                (e.target as HTMLImageElement).nextElementSibling?.classList.remove("hidden");
-              }}
-            />
-          ) : null}
-          {!token.image && (
+            <>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={token.image}
+                alt={token.symbol}
+                className="h-10 w-10 rounded-full object-cover bg-bg-tertiary ring-1 ring-border"
+                onError={(e) => {
+                  (e.target as HTMLImageElement).style.display = "none";
+                  const fallback = (e.target as HTMLImageElement).nextElementSibling as HTMLElement | null;
+                  if (fallback) fallback.style.display = "flex";
+                }}
+              />
+              <div className="h-10 w-10 rounded-full bg-bg-tertiary items-center justify-center text-xs font-bold text-text-muted ring-1 ring-border absolute inset-0" style={{ display: "none" }}>
+                {token.symbol?.charAt(0) || "?"}
+              </div>
+            </>
+          ) : (
             <div className="h-10 w-10 rounded-full bg-bg-tertiary flex items-center justify-center text-xs font-bold text-text-muted ring-1 ring-border">
               {token.symbol?.charAt(0) || "?"}
             </div>
@@ -250,7 +255,7 @@ function TokenColumn({
       </div>
 
       {/* Token list */}
-      <div className="flex flex-col gap-1 overflow-y-auto max-h-[700px] pr-0.5 scrollbar-thin pt-1">
+      <div className="flex flex-col gap-1 overflow-y-auto max-h-[calc(100vh-120px)] pr-0.5 scrollbar-thin pt-1">
         {loading ? (
           Array.from({ length: 8 }).map((_, i) => (
             <div key={i} className="rounded border border-border bg-bg-card p-2.5 animate-pulse h-[80px]" />
