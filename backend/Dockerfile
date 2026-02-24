@@ -23,6 +23,8 @@ COPY --from=build /app/dist ./dist
 COPY --from=build /app/node_modules/.prisma ./node_modules/.prisma
 COPY prisma ./prisma
 COPY package.json ./
+COPY start.sh ./
+RUN chmod +x start.sh
 
 EXPOSE 4000
-CMD ["node", "dist/server.js"]
+CMD ["./start.sh"]
