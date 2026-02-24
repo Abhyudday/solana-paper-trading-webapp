@@ -1,4 +1,15 @@
-const WS_URL = process.env.NEXT_PUBLIC_WS_URL || "ws://localhost:4000";
+function getWsUrl(): string {
+  if (process.env.NEXT_PUBLIC_WS_URL) return process.env.NEXT_PUBLIC_WS_URL;
+  if (typeof window !== "undefined") {
+    const host = window.location.hostname;
+    if (host.includes("railway.app")) {
+      return "wss://paper-trading-backend-production.up.railway.app";
+    }
+  }
+  return "ws://localhost:4000";
+}
+
+const WS_URL = getWsUrl();
 
 type MessageHandler = (data: Record<string, unknown>) => void;
 

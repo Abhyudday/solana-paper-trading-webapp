@@ -1,4 +1,17 @@
-const BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:4000";
+function getBaseUrl(): string {
+  // Build-time env var (set via NEXT_PUBLIC_BACKEND_URL)
+  if (process.env.NEXT_PUBLIC_BACKEND_URL) return process.env.NEXT_PUBLIC_BACKEND_URL;
+  // Runtime detection: if running on Railway, derive backend URL from window location
+  if (typeof window !== "undefined") {
+    const host = window.location.hostname;
+    if (host.includes("railway.app")) {
+      return `https://paper-trading-backend-production.up.railway.app`;
+    }
+  }
+  return "http://localhost:4000";
+}
+
+const BASE_URL = getBaseUrl();
 
 function getToken(): string | null {
   if (typeof window === "undefined") return null;
