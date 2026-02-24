@@ -2,7 +2,7 @@ import { FastifyInstance } from "fastify";
 import { searchSchema, chartSchema } from "../schemas/validation";
 import { SolanaTrackerAdapter } from "../adapters/solana-tracker";
 import { generateOrderBook } from "../services/orderbook";
-import { redis, CACHE_KEYS } from "../lib/redis";
+import { safeGet, CACHE_KEYS } from "../lib/redis";
 
 const adapter = new SolanaTrackerAdapter();
 
@@ -38,7 +38,7 @@ export async function marketRoutes(app: FastifyInstance) {
   app.get("/api/market/tokens/:mint/orderbook", async (request, reply) => {
     const { mint } = request.params as { mint: string };
     let price = 0;
-    const cached = await redis.get(CACHE_KEYS.tokenPrice(mint));
+    const cached = await safeGet(CACHE_KEYS.tokenPrice(mint));
     if (cached) {
       price = parseFloat(cached);
     } else {

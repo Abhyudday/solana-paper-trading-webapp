@@ -5,6 +5,7 @@ import rateLimit from "@fastify/rate-limit";
 import jwt from "@fastify/jwt";
 import websocket from "@fastify/websocket";
 import { config } from "./config";
+import { connectRedis } from "./lib/redis";
 import { authRoutes } from "./routes/auth";
 import { tradeRoutes } from "./routes/trade";
 import { portfolioRoutes } from "./routes/portfolio";
@@ -58,6 +59,7 @@ async function buildApp() {
 }
 
 async function main() {
+  await connectRedis();
   const app = await buildApp();
 
   try {

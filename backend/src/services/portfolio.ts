@@ -1,5 +1,5 @@
 import { prisma } from "../lib/prisma";
-import { redis, CACHE_KEYS } from "../lib/redis";
+import { safeGet, CACHE_KEYS } from "../lib/redis";
 
 export interface PortfolioSummary {
   totalValue: number;
@@ -37,7 +37,7 @@ export async function getPortfolio(userId: string): Promise<PortfolioSummary> {
 
   const positionsWithPrice: PositionWithPrice[] = await Promise.all(
     positions.map(async (pos) => {
-      const cached = await redis.get(CACHE_KEYS.tokenPrice(pos.mint));
+      const cached = await safeGet(CACHE_KEYS.tokenPrice(pos.mint));
       const currentPrice = cached ? parseFloat(cached) : Number(pos.avgEntryPrice);
       const qty = Number(pos.qty);
       const avgEntryPrice = Number(pos.avgEntryPrice);

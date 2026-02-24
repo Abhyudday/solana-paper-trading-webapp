@@ -1,5 +1,5 @@
 import { prisma } from "../lib/prisma";
-import { redis, redisPub, CACHE_KEYS, CHANNELS } from "../lib/redis";
+import { safeGet, safePublish, CACHE_KEYS, CHANNELS } from "../lib/redis";
 import { config } from "../config";
 import { SolanaTrackerAdapter } from "../adapters/solana-tracker";
 
@@ -36,7 +36,7 @@ export async function executeTrade(
   side: "buy" | "sell"
 ): Promise<TradeResult> {
   let basePrice = 0;
-  const cachedPrice = await redis.get(CACHE_KEYS.tokenPrice(mint));
+  const cachedPrice = await safeGet(CACHE_KEYS.tokenPrice(mint));
   if (cachedPrice) {
     basePrice = parseFloat(cachedPrice);
   } else {
@@ -158,11 +158,11 @@ export async function executeTrade(
     totalCost,
   };
 
-  await redisPub.publish(
+  await safePublish(
     CHANNELS.tradeExecuted(userId),
     JSON.stringify(tradeResult)
   );
-  await redisPub.publish(
+  await safePublish(
     CHANNELS.portfolioUpdate(userId),
     JSON.stringify({ userId, timestamp: Date.now() })
   );

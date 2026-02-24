@@ -1,5 +1,5 @@
 import { FastifyInstance } from "fastify";
-import { redisSub, CHANNELS } from "../lib/redis";
+import { redisSub, redisConnected, CHANNELS } from "../lib/redis";
 
 interface WsClient {
   socket: { send: (data: string) => void; readyState: number };
@@ -38,6 +38,11 @@ export async function setupWebSocket(app: FastifyInstance) {
       clients.delete(client);
     });
   });
+
+  if (!redisConnected) {
+    console.warn("Redis not available — WebSocket pub/sub disabled");
+    return;
+  }
 
   await redisSub.subscribe(CHANNELS.priceUpdate);
 

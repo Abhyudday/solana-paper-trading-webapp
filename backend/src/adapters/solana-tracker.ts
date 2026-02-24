@@ -1,5 +1,5 @@
 import { config } from "../config";
-import { redis, CACHE_KEYS } from "../lib/redis";
+import { safeGet, safeSet, CACHE_KEYS } from "../lib/redis";
 import type {
   MarketDataAdapter,
   TokenSearchResult,
@@ -71,7 +71,7 @@ export class SolanaTrackerAdapter implements MarketDataAdapter {
   }
 
   async getTokenInfo(mint: string): Promise<TokenInfo | null> {
-    const cached = await redis.get(CACHE_KEYS.tokenInfo(mint));
+    const cached = await safeGet(CACHE_KEYS.tokenInfo(mint));
     if (cached) return JSON.parse(cached);
 
     try {
@@ -100,8 +100,8 @@ export class SolanaTrackerAdapter implements MarketDataAdapter {
         volume24h: pool?.volume?.h24 || 0,
       };
 
-      await redis.set(CACHE_KEYS.tokenInfo(mint), JSON.stringify(info), "EX", CACHE_TTL_INFO);
-      await redis.set(CACHE_KEYS.tokenPrice(mint), String(info.price), "EX", CACHE_TTL_PRICE);
+      await safeSet(CACHE_KEYS.tokenInfo(mint), JSON.stringify(info), "EX", CACHE_TTL_INFO);
+      await safeSet(CACHE_KEYS.tokenPrice(mint), String(info.price), "EX", CACHE_TTL_PRICE);
 
       return info;
     } catch {
@@ -142,7 +142,7 @@ export class SolanaTrackerAdapter implements MarketDataAdapter {
   }
 
   async getTopTokens(limit: number): Promise<TokenInfo[]> {
-    const cached = await redis.get(CACHE_KEYS.topTokens());
+    const cached = await safeGet(CACHE_KEYS.topTokens());
     if (cached) {
       const parsed = JSON.parse(cached) as TokenInfo[];
       return parsed.slice(0, limit);
@@ -179,7 +179,7 @@ export class SolanaTrackerAdapter implements MarketDataAdapter {
           };
         });
 
-      await redis.set(CACHE_KEYS.topTokens(), JSON.stringify(tokens), "EX", CACHE_TTL_TOP);
+      await safeSet(CACHE_KEYS.topTokens(), JSON.stringify(tokens), "EX", CACHE_TTL_TOP);
       return tokens;
     } catch {
       return [];
@@ -188,7 +188,7 @@ export class SolanaTrackerAdapter implements MarketDataAdapter {
 
   async getLatestTokens(limit: number): Promise<TokenInfo[]> {
     const cacheKey = "market:latest";
-    const cached = await redis.get(cacheKey);
+    const cached = await safeGet(cacheKey);
     if (cached) {
       return (JSON.parse(cached) as TokenInfo[]).slice(0, limit);
     }
@@ -224,7 +224,7 @@ export class SolanaTrackerAdapter implements MarketDataAdapter {
           };
         });
 
-      await redis.set(cacheKey, JSON.stringify(tokens), "EX", 30);
+      await safeSet(cacheKey, JSON.stringify(tokens), "EX", 30);
       return tokens;
     } catch {
       return [];
@@ -233,7 +233,7 @@ export class SolanaTrackerAdapter implements MarketDataAdapter {
 
   async getTrendingTokens(limit: number): Promise<TokenInfo[]> {
     const cacheKey = "market:trending";
-    const cached = await redis.get(cacheKey);
+    const cached = await safeGet(cacheKey);
     if (cached) {
       return (JSON.parse(cached) as TokenInfo[]).slice(0, limit);
     }
@@ -269,7 +269,7 @@ export class SolanaTrackerAdapter implements MarketDataAdapter {
           };
         });
 
-      await redis.set(cacheKey, JSON.stringify(tokens), "EX", 30);
+      await safeSet(cacheKey, JSON.stringify(tokens), "EX", 30);
       return tokens;
     } catch {
       return [];
@@ -278,7 +278,7 @@ export class SolanaTrackerAdapter implements MarketDataAdapter {
 
   async getTokenTrades(mint: string): Promise<TokenTrade[]> {
     const cacheKey = `trades:${mint}`;
-    const cached = await redis.get(cacheKey);
+    const cached = await safeGet(cacheKey);
     if (cached) return JSON.parse(cached) as TokenTrade[];
 
     try {
@@ -306,7 +306,7 @@ export class SolanaTrackerAdapter implements MarketDataAdapter {
         time: t.time || 0,
       }));
 
-      await redis.set(cacheKey, JSON.stringify(trades), "EX", 5);
+      await safeSet(cacheKey, JSON.stringify(trades), "EX", 5);
       return trades;
     } catch {
       return [];
@@ -315,7 +315,7 @@ export class SolanaTrackerAdapter implements MarketDataAdapter {
 
   async getGraduatingTokens(limit: number): Promise<TokenInfo[]> {
     const cacheKey = "market:graduating";
-    const cached = await redis.get(cacheKey);
+    const cached = await safeGet(cacheKey);
     if (cached) return (JSON.parse(cached) as TokenInfo[]).slice(0, limit);
 
     try {
@@ -349,7 +349,7 @@ export class SolanaTrackerAdapter implements MarketDataAdapter {
           };
         });
 
-      await redis.set(cacheKey, JSON.stringify(tokens), "EX", 15);
+      await safeSet(cacheKey, JSON.stringify(tokens), "EX", 15);
       return tokens;
     } catch {
       return [];
@@ -358,7 +358,7 @@ export class SolanaTrackerAdapter implements MarketDataAdapter {
 
   async getGraduatedTokens(limit: number): Promise<TokenInfo[]> {
     const cacheKey = "market:graduated";
-    const cached = await redis.get(cacheKey);
+    const cached = await safeGet(cacheKey);
     if (cached) return (JSON.parse(cached) as TokenInfo[]).slice(0, limit);
 
     try {
@@ -392,7 +392,7 @@ export class SolanaTrackerAdapter implements MarketDataAdapter {
           };
         });
 
-      await redis.set(cacheKey, JSON.stringify(tokens), "EX", 15);
+      await safeSet(cacheKey, JSON.stringify(tokens), "EX", 15);
       return tokens;
     } catch {
       return [];
