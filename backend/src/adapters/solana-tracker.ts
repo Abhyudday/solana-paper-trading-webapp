@@ -14,6 +14,7 @@ import type {
 const CACHE_TTL_PRICE = 15; // seconds
 const CACHE_TTL_INFO = 300;
 const CACHE_TTL_TOP = 60;
+const CACHE_TTL_CHART = 30;
 
 async function fetchApi<T>(path: string, params?: Record<string, string>): Promise<T> {
   const url = new URL(path, config.SOLANA_TRACKER_BASE_URL);
@@ -21,7 +22,7 @@ async function fetchApi<T>(path: string, params?: Record<string, string>): Promi
     Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v));
   }
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 8000);
+  const timeout = setTimeout(() => controller.abort(), 5000);
   const res = await fetch(url.toString(), {
     headers: {
       "x-api-key": config.SOLANA_TRACKER_API_KEY,
@@ -110,35 +111,45 @@ export class SolanaTrackerAdapter implements MarketDataAdapter {
   }
 
   async getOHLCV(mint: string, range: ChartRange): Promise<OHLCVBar[]> {
+    const cacheKey = `chart:${mint}:${range}`;
+    const cached = await safeGet(cacheKey);
+    if (cached) return JSON.parse(cached) as OHLCVBar[];
+
     const now = Math.floor(Date.now() / 1000);
     const from = now - rangeToSeconds(range);
     const interval = range === "1d" ? "1m" : range === "7d" ? "15m" : "1h";
 
-    const data = await fetchApi<{
-      oclhv?: Array<{
-        time?: number;
-        unixTime?: number;
-        open?: number;
-        close?: number;
-        low?: number;
-        high?: number;
-        volume?: number;
-      }>;
-    }>(`/chart/${mint}`, {
-      type: interval,
-      time_from: String(from),
-      time_to: String(now),
-    });
+    try {
+      const data = await fetchApi<{
+        oclhv?: Array<{
+          time?: number;
+          unixTime?: number;
+          open?: number;
+          close?: number;
+          low?: number;
+          high?: number;
+          volume?: number;
+        }>;
+      }>(`/chart/${mint}`, {
+        type: interval,
+        time_from: String(from),
+        time_to: String(now),
+      });
 
-    const bars = data.oclhv || [];
-    return bars.map((b) => ({
-      time: b.time || b.unixTime || 0,
-      open: b.open || 0,
-      high: b.high || 0,
-      low: b.low || 0,
-      close: b.close || 0,
-      volume: b.volume || 0,
-    }));
+      const bars = (data.oclhv || []).map((b) => ({
+        time: b.time || b.unixTime || 0,
+        open: b.open || 0,
+        high: b.high || 0,
+        low: b.low || 0,
+        close: b.close || 0,
+        volume: b.volume || 0,
+      }));
+
+      await safeSet(cacheKey, JSON.stringify(bars), "EX", CACHE_TTL_CHART);
+      return bars;
+    } catch {
+      return [];
+    }
   }
 
   async getTopTokens(limit: number): Promise<TokenInfo[]> {

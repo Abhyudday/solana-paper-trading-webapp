@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo, useCallback } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, TokenInfo, TokenFilterParams, FilteredTokenItem } from "@/lib/api";
 import { formatCompact, formatPrice } from "@/lib/format";
 import { FilterPanel } from "@/components/FilterPanel";
@@ -51,10 +51,21 @@ function sortTokens(tokens: DisplayToken[], key: SortKey): DisplayToken[] {
 }
 
 function TokenCard({ token }: { token: DisplayToken }) {
+  const queryClient = useQueryClient();
+
+  const handlePrefetch = useCallback(() => {
+    queryClient.prefetchQuery({
+      queryKey: ["token", token.mint],
+      queryFn: () => api.market.getToken(token.mint),
+      staleTime: 10000,
+    });
+  }, [queryClient, token.mint]);
+
   return (
     <Link
       href={`/token/${token.mint}`}
       className="flex items-start gap-3 rounded-lg border border-border bg-bg-secondary p-3 hover:border-accent-blue/60 transition-colors"
+      onMouseEnter={handlePrefetch}
     >
       <div className="flex-shrink-0 mt-0.5">
         {token.image ? (
@@ -213,22 +224,22 @@ export default function LandingPage() {
   const { data: latestData, isLoading: latestLoading } = useQuery({
     queryKey: ["latestTokens"],
     queryFn: () => api.market.getLatestTokens(),
-    refetchInterval: 15000,
-    staleTime: 30000,
+    refetchInterval: 5000,
+    staleTime: 3000,
   });
 
   const { data: graduatingData, isLoading: graduatingLoading } = useQuery({
     queryKey: ["graduatingTokens"],
     queryFn: () => api.market.getGraduatingTokens(),
-    refetchInterval: 15000,
-    staleTime: 30000,
+    refetchInterval: 5000,
+    staleTime: 3000,
   });
 
   const { data: graduatedData, isLoading: graduatedLoading } = useQuery({
     queryKey: ["graduatedTokens"],
     queryFn: () => api.market.getGraduatedTokens(),
-    refetchInterval: 15000,
-    staleTime: 30000,
+    refetchInterval: 5000,
+    staleTime: 3000,
   });
 
   // Filtered queries — only enabled when filters are active
@@ -240,24 +251,24 @@ export default function LandingPage() {
     queryKey: ["filteredNew", columnFilters.new],
     queryFn: () => api.market.getFilteredTokens({ ...columnFilters.new, sortBy: "createdAt", sortOrder: "desc" }),
     enabled: newHasFilters,
-    refetchInterval: 15000,
-    staleTime: 15000,
+    refetchInterval: 5000,
+    staleTime: 3000,
   });
 
   const { data: filteredMigrating, isLoading: filteredMigratingLoading } = useQuery({
     queryKey: ["filteredMigrating", columnFilters.migrating],
     queryFn: () => api.market.getFilteredTokens({ ...columnFilters.migrating, status: "graduating" }),
     enabled: migratingHasFilters,
-    refetchInterval: 15000,
-    staleTime: 15000,
+    refetchInterval: 5000,
+    staleTime: 3000,
   });
 
   const { data: filteredMigrated, isLoading: filteredMigratedLoading } = useQuery({
     queryKey: ["filteredMigrated", columnFilters.migrated],
     queryFn: () => api.market.getFilteredTokens({ ...columnFilters.migrated, status: "graduated" }),
     enabled: migratedHasFilters,
-    refetchInterval: 15000,
-    staleTime: 15000,
+    refetchInterval: 5000,
+    staleTime: 3000,
   });
 
   const handleApplyFilter = useCallback((col: ColumnId, filters: TokenFilterParams) => {

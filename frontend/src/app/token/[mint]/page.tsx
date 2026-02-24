@@ -30,14 +30,16 @@ export default function TokenPage() {
     queryKey: ["token", mint],
     queryFn: () => api.market.getToken(mint),
     enabled: !!mint,
-    refetchInterval: 10000,
+    refetchInterval: 5000,
+    staleTime: 10000,
   });
 
   const { data: chartData, isLoading: chartLoading } = useQuery({
     queryKey: ["chart", mint, range],
     queryFn: () => api.market.getChart(mint, range),
     enabled: !!mint,
-    refetchInterval: 3000,
+    refetchInterval: 10000,
+    staleTime: 15000,
   });
 
   const { data: portfolio } = useQuery({
