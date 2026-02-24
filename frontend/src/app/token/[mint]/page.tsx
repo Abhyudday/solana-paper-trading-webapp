@@ -26,18 +26,19 @@ export default function TokenPage() {
   const { isAuthenticated } = useAuth();
   const [range, setRange] = useState<ChartRange>("1d");
 
-  const { data: tokenInfo, isLoading: tokenLoading } = useQuery({
+  const { data: tokenInfo, isLoading: tokenLoading, isFetching: tokenFetching } = useQuery({
     queryKey: ["token", mint],
     queryFn: () => api.market.getToken(mint),
     enabled: !!mint,
     refetchInterval: 5000,
     staleTime: 10000,
+    retry: 2,
   });
 
   const { data: chartData, isLoading: chartLoading } = useQuery({
     queryKey: ["chart", mint, range],
     queryFn: () => api.market.getChart(mint, range),
-    enabled: !!mint,
+    enabled: !!mint && !!tokenInfo,
     refetchInterval: 10000,
     staleTime: 15000,
   });
@@ -60,20 +61,24 @@ export default function TokenPage() {
   const position = portfolio?.positions.find((p) => p.mint === mint);
   const tokenQty = position?.qty ?? 0;
 
-  if (tokenLoading) {
-    return (
-      <div className="flex items-center justify-center h-96">
-        <div className="text-text-muted">Loading token data...</div>
-      </div>
-    );
-  }
-
-  if (!tokenInfo) {
-    return (
-      <div className="flex items-center justify-center h-96">
-        <div className="text-text-muted">Token not found</div>
-      </div>
-    );
+  if (tokenLoading || tokenFetching || !tokenInfo) {
+    if (!tokenInfo && !tokenLoading && !tokenFetching) {
+      return (
+        <div className="flex items-center justify-center h-96">
+          <div className="text-text-muted">Token not found</div>
+        </div>
+      );
+    }
+    if (!tokenInfo) {
+      return (
+        <div className="flex items-center justify-center h-96">
+          <div className="flex flex-col items-center gap-3">
+            <div className="h-8 w-8 border-2 border-accent-blue border-t-transparent rounded-full animate-spin" />
+            <div className="text-text-muted text-sm">Loading token data...</div>
+          </div>
+        </div>
+      );
+    }
   }
 
   return (
