@@ -250,7 +250,7 @@ function TokenColumn({
       </div>
 
       {/* Token list */}
-      <div className="flex flex-col gap-1 overflow-y-auto max-h-[calc(100vh-120px)] pr-0.5 scrollbar-thin pt-1">
+      <div className="flex flex-col gap-1 overflow-y-auto max-h-[700px] pr-0.5 scrollbar-thin pt-1">
         {loading ? (
           Array.from({ length: 8 }).map((_, i) => (
             <div key={i} className="rounded border border-border bg-bg-card p-2.5 animate-pulse h-[80px]" />
