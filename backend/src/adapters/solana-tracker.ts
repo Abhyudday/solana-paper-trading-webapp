@@ -6,6 +6,9 @@ import type {
   TokenInfo,
   OHLCVBar,
   ChartRange,
+  TokenTrade,
+  TokenFilterParams,
+  FilteredTokenItem,
 } from "./market-data";
 
 const CACHE_TTL_PRICE = 15; // seconds
@@ -268,6 +271,224 @@ export class SolanaTrackerAdapter implements MarketDataAdapter {
 
       await redis.set(cacheKey, JSON.stringify(tokens), "EX", 30);
       return tokens;
+    } catch {
+      return [];
+    }
+  }
+
+  async getTokenTrades(mint: string): Promise<TokenTrade[]> {
+    const cacheKey = `trades:${mint}`;
+    const cached = await redis.get(cacheKey);
+    if (cached) return JSON.parse(cached) as TokenTrade[];
+
+    try {
+      const data = await fetchApi<{
+        trades?: Array<{
+          tx?: string;
+          type?: string;
+          amount?: number;
+          volume?: number;
+          volumeSol?: number;
+          priceUsd?: number;
+          wallet?: string;
+          time?: number;
+        }>;
+      }>(`trades/${mint}`);
+
+      const trades: TokenTrade[] = (data.trades || []).slice(0, 50).map((t) => ({
+        tx: t.tx || "",
+        type: (t.type === "buy" ? "buy" : "sell") as "buy" | "sell",
+        amountUsd: t.volume || 0,
+        volumeSol: t.volumeSol || 0,
+        priceUsd: t.priceUsd || 0,
+        marketCap: 0,
+        wallet: t.wallet || "",
+        time: t.time || 0,
+      }));
+
+      await redis.set(cacheKey, JSON.stringify(trades), "EX", 5);
+      return trades;
+    } catch {
+      return [];
+    }
+  }
+
+  async getGraduatingTokens(limit: number): Promise<TokenInfo[]> {
+    const cacheKey = "market:graduating";
+    const cached = await redis.get(cacheKey);
+    if (cached) return (JSON.parse(cached) as TokenInfo[]).slice(0, limit);
+
+    try {
+      const data = await fetchApi<Array<{
+        token?: { mint?: string; symbol?: string; name?: string; decimals?: number; image?: string };
+        pools?: Array<{
+          price?: { usd?: number };
+          liquidity?: { usd?: number };
+          marketCap?: { usd?: number };
+          volume?: { h24?: number };
+        }>;
+      }>>("tokens/multi/graduating");
+
+      const items = Array.isArray(data) ? data : [];
+      const tokens: TokenInfo[] = items
+        .filter((item) => item.token?.mint && item.token?.symbol)
+        .slice(0, limit)
+        .map((item) => {
+          const pool = item.pools?.[0];
+          return {
+            mint: item.token?.mint || "",
+            symbol: item.token?.symbol || "",
+            name: item.token?.name || "",
+            decimals: item.token?.decimals || 9,
+            supply: 0,
+            liquidity: pool?.liquidity?.usd || 0,
+            price: pool?.price?.usd || 0,
+            marketCap: pool?.marketCap?.usd || 0,
+            image: item.token?.image,
+            volume24h: pool?.volume?.h24 || 0,
+          };
+        });
+
+      await redis.set(cacheKey, JSON.stringify(tokens), "EX", 15);
+      return tokens;
+    } catch {
+      return [];
+    }
+  }
+
+  async getGraduatedTokens(limit: number): Promise<TokenInfo[]> {
+    const cacheKey = "market:graduated";
+    const cached = await redis.get(cacheKey);
+    if (cached) return (JSON.parse(cached) as TokenInfo[]).slice(0, limit);
+
+    try {
+      const data = await fetchApi<Array<{
+        token?: { mint?: string; symbol?: string; name?: string; decimals?: number; image?: string };
+        pools?: Array<{
+          price?: { usd?: number };
+          liquidity?: { usd?: number };
+          marketCap?: { usd?: number };
+          volume?: { h24?: number };
+        }>;
+      }>>("tokens/multi/graduated");
+
+      const items = Array.isArray(data) ? data : [];
+      const tokens: TokenInfo[] = items
+        .filter((item) => item.token?.mint && item.token?.symbol)
+        .slice(0, limit)
+        .map((item) => {
+          const pool = item.pools?.[0];
+          return {
+            mint: item.token?.mint || "",
+            symbol: item.token?.symbol || "",
+            name: item.token?.name || "",
+            decimals: item.token?.decimals || 9,
+            supply: 0,
+            liquidity: pool?.liquidity?.usd || 0,
+            price: pool?.price?.usd || 0,
+            marketCap: pool?.marketCap?.usd || 0,
+            image: item.token?.image,
+            volume24h: pool?.volume?.h24 || 0,
+          };
+        });
+
+      await redis.set(cacheKey, JSON.stringify(tokens), "EX", 15);
+      return tokens;
+    } catch {
+      return [];
+    }
+  }
+
+  async getFilteredTokens(filters: TokenFilterParams): Promise<FilteredTokenItem[]> {
+    const params: Record<string, string> = {
+      limit: String(filters.limit || 30),
+      sortBy: filters.sortBy || "createdAt",
+      sortOrder: filters.sortOrder || "desc",
+    };
+
+    if (filters.status) params.status = filters.status;
+    if (filters.minLiquidity !== undefined) params.minLiquidity = String(filters.minLiquidity);
+    if (filters.maxLiquidity !== undefined) params.maxLiquidity = String(filters.maxLiquidity);
+    if (filters.minMarketCap !== undefined) params.minMarketCap = String(filters.minMarketCap);
+    if (filters.maxMarketCap !== undefined) params.maxMarketCap = String(filters.maxMarketCap);
+    if (filters.minVolume !== undefined) params.minVolume = String(filters.minVolume);
+    if (filters.maxVolume !== undefined) params.maxVolume = String(filters.maxVolume);
+    if (filters.volumeTimeframe) params.volumeTimeframe = filters.volumeTimeframe;
+    if (filters.minBuys !== undefined) params.minBuys = String(filters.minBuys);
+    if (filters.maxBuys !== undefined) params.maxBuys = String(filters.maxBuys);
+    if (filters.minSells !== undefined) params.minSells = String(filters.minSells);
+    if (filters.maxSells !== undefined) params.maxSells = String(filters.maxSells);
+    if (filters.minTotalTransactions !== undefined) params.minTotalTransactions = String(filters.minTotalTransactions);
+    if (filters.maxTotalTransactions !== undefined) params.maxTotalTransactions = String(filters.maxTotalTransactions);
+    if (filters.minHolders !== undefined) params.minHolders = String(filters.minHolders);
+    if (filters.maxHolders !== undefined) params.maxHolders = String(filters.maxHolders);
+    if (filters.minCurvePercentage !== undefined) params.minCurvePercentage = String(filters.minCurvePercentage);
+    if (filters.maxCurvePercentage !== undefined) params.maxCurvePercentage = String(filters.maxCurvePercentage);
+    if (filters.minFeesTotal !== undefined) params.minFeesTotal = String(filters.minFeesTotal);
+    if (filters.maxFeesTotal !== undefined) params.maxFeesTotal = String(filters.maxFeesTotal);
+    if (filters.minCreatedAt !== undefined) params.minCreatedAt = String(filters.minCreatedAt);
+    if (filters.maxCreatedAt !== undefined) params.maxCreatedAt = String(filters.maxCreatedAt);
+
+    try {
+      const data = await fetchApi<{
+        status?: string;
+        data?: Array<{
+          mint?: string;
+          symbol?: string;
+          name?: string;
+          image?: string;
+          priceUsd?: number;
+          marketCapUsd?: number;
+          liquidityUsd?: number;
+          volume_24h?: number;
+          volume?: number;
+          buys?: number;
+          sells?: number;
+          totalTransactions?: number;
+          holders?: number;
+          launchpad?: { curvePercentage?: number };
+          fees?: { total?: number };
+          createdAt?: number;
+        }>;
+      }>("search", params);
+
+      const items = data.data || (Array.isArray(data) ? data as unknown[] : []);
+      return (items as Array<{
+        mint?: string;
+        symbol?: string;
+        name?: string;
+        image?: string;
+        priceUsd?: number;
+        marketCapUsd?: number;
+        liquidityUsd?: number;
+        volume_24h?: number;
+        volume?: number;
+        buys?: number;
+        sells?: number;
+        totalTransactions?: number;
+        holders?: number;
+        launchpad?: { curvePercentage?: number };
+        fees?: { total?: number };
+        createdAt?: number;
+      }>)
+        .filter((item) => item.mint && item.symbol)
+        .map((item) => ({
+          mint: item.mint || "",
+          symbol: item.symbol || "",
+          name: item.name || "",
+          image: item.image,
+          price: item.priceUsd || 0,
+          marketCap: item.marketCapUsd || 0,
+          liquidity: item.liquidityUsd || 0,
+          volume24h: item.volume_24h || item.volume || 0,
+          buys: item.buys || 0,
+          sells: item.sells || 0,
+          totalTransactions: item.totalTransactions || 0,
+          holders: item.holders || 0,
+          curvePercentage: item.launchpad?.curvePercentage,
+          feesTotal: item.fees?.total,
+          createdAt: item.createdAt,
+        }));
     } catch {
       return [];
     }

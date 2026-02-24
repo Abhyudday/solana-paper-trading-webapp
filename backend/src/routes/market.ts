@@ -66,4 +66,61 @@ export async function marketRoutes(app: FastifyInstance) {
     const tokens = await adapter.getTrendingTokens(20);
     return reply.send({ tokens });
   });
+
+  app.get("/api/market/tokens/:mint/trades", async (request, reply) => {
+    const { mint } = request.params as { mint: string };
+    const trades = await adapter.getTokenTrades(mint);
+    return reply.send({ trades });
+  });
+
+  app.get("/api/market/graduating", async (_request, reply) => {
+    const tokens = await adapter.getGraduatingTokens(20);
+    return reply.send({ tokens });
+  });
+
+  app.get("/api/market/graduated", async (_request, reply) => {
+    const tokens = await adapter.getGraduatedTokens(20);
+    return reply.send({ tokens });
+  });
+
+  app.get("/api/market/filtered", async (request, reply) => {
+    const q = request.query as Record<string, string>;
+    const toNum = (v: string | undefined) => v !== undefined && v !== "" ? Number(v) : undefined;
+
+    const filters = {
+      status: q.status as "graduating" | "graduated" | "default" | undefined,
+      sortBy: q.sortBy,
+      sortOrder: q.sortOrder as "asc" | "desc" | undefined,
+      minLiquidity: toNum(q.minLiquidity),
+      maxLiquidity: toNum(q.maxLiquidity),
+      minMarketCap: toNum(q.minMarketCap),
+      maxMarketCap: toNum(q.maxMarketCap),
+      minVolume: toNum(q.minVolume),
+      maxVolume: toNum(q.maxVolume),
+      volumeTimeframe: q.volumeTimeframe,
+      minBuys: toNum(q.minBuys),
+      maxBuys: toNum(q.maxBuys),
+      minSells: toNum(q.minSells),
+      maxSells: toNum(q.maxSells),
+      minTotalTransactions: toNum(q.minTotalTransactions),
+      maxTotalTransactions: toNum(q.maxTotalTransactions),
+      minHolders: toNum(q.minHolders),
+      maxHolders: toNum(q.maxHolders),
+      minCurvePercentage: toNum(q.minCurvePercentage),
+      maxCurvePercentage: toNum(q.maxCurvePercentage),
+      minFeesTotal: toNum(q.minFeesTotal),
+      maxFeesTotal: toNum(q.maxFeesTotal),
+      minCreatedAt: toNum(q.minCreatedAt),
+      maxCreatedAt: toNum(q.maxCreatedAt),
+      limit: toNum(q.limit),
+    };
+
+    // Strip undefined values
+    const cleaned = Object.fromEntries(
+      Object.entries(filters).filter(([, v]) => v !== undefined)
+    );
+
+    const tokens = await adapter.getFilteredTokens(cleaned);
+    return reply.send({ tokens });
+  });
 }

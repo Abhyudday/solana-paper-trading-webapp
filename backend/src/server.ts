@@ -70,8 +70,8 @@ async function main() {
     const adapter = new SolanaTrackerAdapter();
     Promise.all([
       adapter.getLatestTokens(20),
-      adapter.getTrendingTokens(20),
-      adapter.getTopTokens(20),
+      adapter.getGraduatingTokens(20),
+      adapter.getGraduatedTokens(20),
     ]).then(() => console.log("Cache warmup complete")).catch(() => {});
   } catch (err) {
     app.log.error(err);

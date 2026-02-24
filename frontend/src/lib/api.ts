@@ -39,6 +39,16 @@ export const api = {
     getTopTokens: () => request<{ tokens: TokenInfo[] }>("/api/market/top"),
     getLatestTokens: () => request<{ tokens: TokenInfo[] }>("/api/market/latest"),
     getTrendingTokens: () => request<{ tokens: TokenInfo[] }>("/api/market/trending"),
+    getTokenTrades: (mint: string) => request<{ trades: TokenTrade[] }>(`/api/market/tokens/${mint}/trades`),
+    getGraduatingTokens: () => request<{ tokens: TokenInfo[] }>("/api/market/graduating"),
+    getGraduatedTokens: () => request<{ tokens: TokenInfo[] }>("/api/market/graduated"),
+    getFilteredTokens: (filters: TokenFilterParams) => {
+      const params = new URLSearchParams();
+      Object.entries(filters).forEach(([k, v]) => {
+        if (v !== undefined && v !== "") params.set(k, String(v));
+      });
+      return request<{ tokens: FilteredTokenItem[] }>(`/api/market/filtered?${params.toString()}`);
+    },
   },
   trade: {
     execute: (mint: string, amount: number, side: "buy" | "sell") =>
@@ -138,4 +148,61 @@ export interface Trade {
   fee: number;
   slippage: number;
   timestamp: string;
+}
+
+export interface TokenTrade {
+  tx: string;
+  type: "buy" | "sell";
+  amountUsd: number;
+  volumeSol: number;
+  priceUsd: number;
+  marketCap: number;
+  wallet: string;
+  time: number;
+}
+
+export interface TokenFilterParams {
+  status?: "graduating" | "graduated" | "default";
+  sortBy?: string;
+  sortOrder?: "asc" | "desc";
+  minLiquidity?: number;
+  maxLiquidity?: number;
+  minMarketCap?: number;
+  maxMarketCap?: number;
+  minVolume?: number;
+  maxVolume?: number;
+  volumeTimeframe?: string;
+  minBuys?: number;
+  maxBuys?: number;
+  minSells?: number;
+  maxSells?: number;
+  minTotalTransactions?: number;
+  maxTotalTransactions?: number;
+  minHolders?: number;
+  maxHolders?: number;
+  minCurvePercentage?: number;
+  maxCurvePercentage?: number;
+  minFeesTotal?: number;
+  maxFeesTotal?: number;
+  minCreatedAt?: number;
+  maxCreatedAt?: number;
+  limit?: number;
+}
+
+export interface FilteredTokenItem {
+  mint: string;
+  symbol: string;
+  name: string;
+  image?: string;
+  price: number;
+  marketCap: number;
+  liquidity: number;
+  volume24h: number;
+  buys: number;
+  sells: number;
+  totalTransactions: number;
+  holders: number;
+  curvePercentage?: number;
+  feesTotal?: number;
+  createdAt?: number;
 }

@@ -3,15 +3,15 @@
 @tailwind utilities;
 
 :root {
-  --bg-primary: #0a0e17;
-  --bg-secondary: #111827;
-  --bg-tertiary: #1f2937;
-  --accent-green: #00e676;
-  --accent-red: #ff1744;
-  --accent-blue: #2979ff;
-  --text-primary: #f3f4f6;
-  --text-secondary: #9ca3af;
-  --border: #374151;
+  --bg-primary: #05080f;
+  --bg-secondary: #0b1120;
+  --bg-tertiary: #131b2e;
+  --accent-green: #00ff88;
+  --accent-red: #ff3358;
+  --accent-blue: #3b8bff;
+  --text-primary: #eef0f4;
+  --text-secondary: #8a94a6;
+  --border: #1a2235;
 }
 
 html {

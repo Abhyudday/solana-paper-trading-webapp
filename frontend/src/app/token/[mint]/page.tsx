@@ -9,7 +9,7 @@ import { useAuth } from "@/context/AuthContext";
 import { wsClient } from "@/lib/ws";
 import { formatPrice, formatCompact, formatNumber } from "@/lib/format";
 import { OrderPanel } from "@/components/OrderPanel";
-import { OrderBook } from "@/components/OrderBook";
+import { Transactions } from "@/components/OrderBook";
 
 const Chart = dynamic(() => import("@/components/Chart").then((m) => m.Chart), {
   ssr: false,
@@ -108,8 +108,8 @@ export default function TokenPage() {
       {/* Main Grid: Chart + Order Panel */}
       <div className="grid grid-cols-1 lg:grid-cols-[1fr_340px] gap-4 mb-4">
         {/* Chart */}
-        <div className="rounded-lg border border-border bg-bg-secondary p-4">
-          <div className="flex items-center gap-2 mb-3">
+        <div className="rounded-lg border border-border bg-bg-primary overflow-hidden">
+          <div className="flex items-center gap-2 px-4 py-3 border-b border-border bg-bg-secondary">
             {(["1d", "7d", "30d"] as ChartRange[]).map((r) => (
               <button
                 key={r}
@@ -126,9 +126,9 @@ export default function TokenPage() {
             ))}
           </div>
           {chartData?.bars && chartData.bars.length > 0 ? (
-            <Chart data={chartData.bars} height={400} />
+            <Chart data={chartData.bars} height={420} />
           ) : (
-            <div className="flex items-center justify-center h-[400px] text-text-muted">
+            <div className="flex items-center justify-center h-[420px] text-text-muted bg-bg-primary">
               {chartLoading ? "Loading chart..." : "No chart data available"}
             </div>
           )}
@@ -138,8 +138,8 @@ export default function TokenPage() {
         <OrderPanel token={tokenInfo} usdcBalance={usdcBalance} tokenQty={tokenQty} />
       </div>
 
-      {/* Order Book */}
-      <OrderBook mint={mint} />
+      {/* Transactions */}
+      <Transactions mint={mint} />
 
       {/* Token Details */}
       <div className="mt-4 rounded-lg border border-border bg-bg-secondary p-4">

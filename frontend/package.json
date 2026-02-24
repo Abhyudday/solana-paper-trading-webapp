@@ -20,7 +20,7 @@
     "@solana/web3.js": "^1.91.8",
     "@tanstack/react-query": "^5.45.1",
     "lightweight-charts": "^4.1.7",
-    "next": "14.2.4",
+    "next": "^14.2.35",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"
   },

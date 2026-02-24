@@ -45,9 +45,10 @@ export function SearchBar() {
         role="combobox"
         aria-expanded={open}
         aria-autocomplete="list"
+        aria-controls="search-listbox"
       />
       {open && data?.results && data.results.length > 0 && (
-        <ul className="absolute top-full left-0 right-0 mt-1 max-h-80 overflow-y-auto rounded-lg border border-border bg-bg-secondary shadow-xl z-50" role="listbox">
+        <ul id="search-listbox" className="absolute top-full left-0 right-0 mt-1 max-h-80 overflow-y-auto rounded-lg border border-border bg-bg-secondary shadow-xl z-50" role="listbox">
           {data.results.map((token) => (
             <li key={token.mint}>
               <button

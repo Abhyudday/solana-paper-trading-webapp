@@ -31,6 +31,63 @@ export interface OHLCVBar {
 
 export type ChartRange = "1d" | "7d" | "30d";
 
+export interface TokenTrade {
+  tx: string;
+  type: "buy" | "sell";
+  amountUsd: number;
+  volumeSol: number;
+  priceUsd: number;
+  marketCap: number;
+  wallet: string;
+  time: number;
+}
+
+export interface TokenFilterParams {
+  status?: "graduating" | "graduated" | "default";
+  sortBy?: string;
+  sortOrder?: "asc" | "desc";
+  minLiquidity?: number;
+  maxLiquidity?: number;
+  minMarketCap?: number;
+  maxMarketCap?: number;
+  minVolume?: number;
+  maxVolume?: number;
+  volumeTimeframe?: string;
+  minBuys?: number;
+  maxBuys?: number;
+  minSells?: number;
+  maxSells?: number;
+  minTotalTransactions?: number;
+  maxTotalTransactions?: number;
+  minHolders?: number;
+  maxHolders?: number;
+  minCurvePercentage?: number;
+  maxCurvePercentage?: number;
+  minFeesTotal?: number;
+  maxFeesTotal?: number;
+  minCreatedAt?: number;
+  maxCreatedAt?: number;
+  limit?: number;
+}
+
+export interface FilteredTokenItem {
+  mint: string;
+  symbol: string;
+  name: string;
+  image?: string;
+  price: number;
+  marketCap: number;
+  liquidity: number;
+  volume24h: number;
+  buys: number;
+  sells: number;
+  totalTransactions: number;
+  holders: number;
+  curvePercentage?: number;
+  feesTotal?: number;
+  createdAt?: number;
+}
+
 export interface MarketDataAdapter {
   searchTokens(query: string): Promise<TokenSearchResult[]>;
   getTokenInfo(mint: string): Promise<TokenInfo | null>;
@@ -38,4 +95,8 @@ export interface MarketDataAdapter {
   getTopTokens(limit: number): Promise<TokenInfo[]>;
   getLatestTokens(limit: number): Promise<TokenInfo[]>;
   getTrendingTokens(limit: number): Promise<TokenInfo[]>;
+  getTokenTrades(mint: string): Promise<TokenTrade[]>;
+  getGraduatingTokens(limit: number): Promise<TokenInfo[]>;
+  getGraduatedTokens(limit: number): Promise<TokenInfo[]>;
+  getFilteredTokens(filters: TokenFilterParams): Promise<FilteredTokenItem[]>;
 }
