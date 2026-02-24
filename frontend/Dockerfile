@@ -2,7 +2,7 @@ FROM node:20-alpine AS base
 WORKDIR /app
 
 FROM base AS deps
-RUN apk add --no-cache python3 make g++
+RUN apk add --no-cache python3 make g++ linux-headers eudev-dev
 COPY package.json package-lock.json* ./
 RUN npm install --legacy-peer-deps
 
