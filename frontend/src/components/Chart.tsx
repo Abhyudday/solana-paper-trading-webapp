@@ -36,7 +36,7 @@ export function Chart({ data, height = 400 }: ChartProps) {
     const priceDecimals = minPrice < 0.0001 ? 10 : minPrice < 0.01 ? 8 : minPrice < 1 ? 6 : 2;
     const formatPrice = (p: number): string => {
       if (p === 0) return "0";
-      if (p < 0.0001) return p.toExponential(4);
+      // Always show real decimal value, never exponential
       return p.toFixed(priceDecimals);
     };
 
