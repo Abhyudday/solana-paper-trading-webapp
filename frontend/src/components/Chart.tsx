@@ -42,28 +42,28 @@ export function Chart({ data, height = 400 }: ChartProps) {
 
     const chartOptions = {
       layout: {
-        background: { color: "#05080f" },
-        textColor: "#525c6e",
+        background: { color: "#0b0e11" },
+        textColor: "#505258",
         fontFamily: "'Inter', system-ui, sans-serif",
         fontSize: 11,
       },
       grid: {
-        vertLines: { color: "rgba(26,34,53,0.5)" },
-        horzLines: { color: "rgba(26,34,53,0.5)" },
+        vertLines: { color: "rgba(30,33,40,0.5)" },
+        horzLines: { color: "rgba(30,33,40,0.5)" },
       },
       crosshair: {
         mode: 0 as const,
         vertLine: {
-          color: "rgba(59,139,255,0.4)",
+          color: "rgba(0,200,83,0.3)",
           width: 1 as const,
           style: 2 as const,
-          labelBackgroundColor: "#3b8bff",
+          labelBackgroundColor: "#00c853",
         },
         horzLine: {
-          color: "rgba(59,139,255,0.4)",
+          color: "rgba(0,200,83,0.3)",
           width: 1 as const,
           style: 2 as const,
-          labelBackgroundColor: "#3b8bff",
+          labelBackgroundColor: "#00c853",
         },
       },
     };
@@ -73,11 +73,11 @@ export function Chart({ data, height = 400 }: ChartProps) {
       ...chartOptions,
       height,
       rightPriceScale: {
-        borderColor: "#1a2235",
+        borderColor: "#1e2128",
         scaleMargins: { top: 0.05, bottom: 0.05 },
       },
       timeScale: {
-        borderColor: "#1a2235",
+        borderColor: "#1e2128",
         timeVisible: true,
         secondsVisible: false,
       },
@@ -87,12 +87,12 @@ export function Chart({ data, height = 400 }: ChartProps) {
     });
 
     const candleSeries = priceChart.addCandlestickSeries({
-      upColor: "#00ff88",
-      downColor: "#ff3358",
-      borderDownColor: "#ff3358",
-      borderUpColor: "#00ff88",
-      wickDownColor: "#ff335899",
-      wickUpColor: "#00ff8899",
+      upColor: "#00c853",
+      downColor: "#ff3b3b",
+      borderDownColor: "#ff3b3b",
+      borderUpColor: "#00c853",
+      wickDownColor: "#ff3b3b99",
+      wickUpColor: "#00c85399",
     });
 
     // --- Volume chart (separate panel below) ---
@@ -100,11 +100,11 @@ export function Chart({ data, height = 400 }: ChartProps) {
       ...chartOptions,
       height: volumeHeight,
       rightPriceScale: {
-        borderColor: "#1a2235",
+        borderColor: "#1e2128",
         scaleMargins: { top: 0.1, bottom: 0 },
       },
       timeScale: {
-        borderColor: "#1a2235",
+        borderColor: "#1e2128",
         timeVisible: true,
         secondsVisible: false,
         visible: true,
@@ -130,7 +130,7 @@ export function Chart({ data, height = 400 }: ChartProps) {
     const volumeData: HistogramData<Time>[] = filtered.map((bar) => ({
       time: bar.time as Time,
       value: bar.volume,
-      color: bar.close >= bar.open ? "rgba(0,255,136,0.55)" : "rgba(255,51,88,0.55)",
+      color: bar.close >= bar.open ? "rgba(0,200,83,0.55)" : "rgba(255,59,59,0.55)",
     }));
 
     if (mapped.length > 0) {
@@ -186,11 +186,11 @@ export function Chart({ data, height = 400 }: ChartProps) {
   return (
     <div className="w-full rounded-lg overflow-hidden" role="img" aria-label="Token price chart">
       <div ref={priceContainerRef} className="w-full" />
-      <div className="flex items-center gap-1.5 px-2 py-1 bg-[#05080f]">
-        <span className="text-[10px] font-medium text-[#525c6e] uppercase tracking-wider">Buy Volume</span>
-        <span className="inline-block w-2.5 h-2.5 rounded-sm bg-[#00ff88]/60" />
-        <span className="text-[10px] font-medium text-[#525c6e] uppercase tracking-wider ml-2">Sell Volume</span>
-        <span className="inline-block w-2.5 h-2.5 rounded-sm bg-[#ff3358]/60" />
+      <div className="flex items-center gap-1.5 px-2 py-1 bg-[#0b0e11]">
+        <span className="text-[9px] font-medium text-[#505258] uppercase tracking-wider">Buy</span>
+        <span className="inline-block w-2 h-2 rounded-sm bg-[#00c853]/60" />
+        <span className="text-[9px] font-medium text-[#505258] uppercase tracking-wider ml-2">Sell</span>
+        <span className="inline-block w-2 h-2 rounded-sm bg-[#ff3b3b]/60" />
       </div>
       <div ref={volumeContainerRef} className="w-full" />
     </div>

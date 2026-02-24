@@ -46,29 +46,29 @@ export function Transactions({ mint }: TransactionsProps) {
   const trades = data?.trades || [];
 
   return (
-    <div className="rounded-lg border border-border bg-bg-secondary overflow-hidden">
-      <div className="flex items-center justify-between px-3 py-2.5 border-b border-border">
-        <h3 className="text-xs font-bold uppercase tracking-widest text-text-secondary">Transactions</h3>
-        <span className="text-[10px] text-accent-green font-medium">live</span>
+    <div className="rounded border border-border bg-bg-card overflow-hidden">
+      <div className="flex items-center justify-between px-3 py-1.5 border-b border-border bg-bg-secondary">
+        <h3 className="text-[10px] font-semibold text-text-muted uppercase tracking-wider">Trades</h3>
+        <span className="text-[9px] text-accent-green font-medium animate-pulse">live</span>
       </div>
 
       {/* Column headers */}
-      <div className="flex items-center gap-2 px-3 py-1.5 text-[10px] text-text-muted uppercase tracking-wide border-b border-border/60">
+      <div className="flex items-center gap-2 px-3 py-1 text-[9px] text-text-muted uppercase tracking-wide border-b border-border/40">
         <div className="w-0.5 flex-shrink-0" />
-        <span className="w-[72px] text-right flex-shrink-0">Amount USD</span>
+        <span className="w-[72px] text-right flex-shrink-0">Amount</span>
         <span className="w-[60px] text-right flex-shrink-0">Price</span>
         <span className="flex-1">Trader</span>
         <span className="text-right w-[64px] flex-shrink-0">Age</span>
       </div>
 
       {/* Trades list */}
-      <div className="max-h-[500px] overflow-y-auto scrollbar-thin">
+      <div className="max-h-[300px] overflow-y-auto scrollbar-thin">
         {isLoading ? (
-          Array.from({ length: 10 }).map((_, i) => (
-            <div key={i} className="h-9 animate-pulse bg-bg-tertiary/20 border-b border-border/40" />
+          Array.from({ length: 8 }).map((_, i) => (
+            <div key={i} className="h-7 animate-pulse bg-bg-tertiary/10 border-b border-border/20" />
           ))
         ) : trades.length === 0 ? (
-          <div className="text-center text-text-muted text-xs py-8">No transactions found</div>
+          <div className="text-center text-text-muted text-[10px] py-6">No transactions found</div>
         ) : (
           trades.map((trade, i) => <TxRow key={`${trade.tx}-${i}`} trade={trade} />)
         )}

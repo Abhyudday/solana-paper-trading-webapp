@@ -6,10 +6,10 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        bg: { primary: "#05080f", secondary: "#0b1120", tertiary: "#131b2e" },
-        accent: { green: "#00ff88", red: "#ff3358", blue: "#3b8bff", yellow: "#ffca28" },
-        text: { primary: "#eef0f4", secondary: "#8a94a6", muted: "#525c6e" },
-        border: { DEFAULT: "#1a2235" },
+        bg: { primary: "#0b0e11", secondary: "#111418", tertiary: "#1a1d23", card: "#141720" },
+        accent: { green: "#00c853", red: "#ff3b3b", blue: "#3b8bff", yellow: "#ffd600", orange: "#ff9100" },
+        text: { primary: "#e8eaed", secondary: "#8b8d93", muted: "#505258" },
+        border: { DEFAULT: "#1e2128" },
       },
       fontFamily: {
         mono: ["JetBrains Mono", "Fira Code", "monospace"],

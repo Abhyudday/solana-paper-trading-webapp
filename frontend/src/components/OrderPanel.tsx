@@ -12,6 +12,8 @@ interface OrderPanelProps {
   tokenQty: number;
 }
 
+const PRESET_AMOUNTS = [10, 25, 50, 100];
+
 export function OrderPanel({ token, usdcBalance, tokenQty }: OrderPanelProps) {
   const { isAuthenticated } = useAuth();
   const queryClient = useQueryClient();
@@ -65,16 +67,14 @@ export function OrderPanel({ token, usdcBalance, tokenQty }: OrderPanelProps) {
   }
 
   return (
-    <div className="rounded-lg border border-border bg-bg-secondary p-4">
-      <h3 className="text-sm font-bold mb-3">Order Entry</h3>
-
-      {/* Side Tabs */}
-      <div className="flex gap-1 mb-4">
+    <div className="rounded border border-border bg-bg-card p-3">
+      {/* Buy / Sell Tabs */}
+      <div className="flex gap-0.5 mb-3">
         <button
           onClick={() => setSide("buy")}
-          className={`flex-1 py-2 rounded-md text-sm font-bold transition-colors ${
+          className={`flex-1 py-1.5 rounded text-xs font-bold transition-colors ${
             side === "buy"
-              ? "bg-accent-green/20 text-accent-green border border-accent-green/40"
+              ? "bg-accent-green text-black"
               : "bg-bg-tertiary text-text-muted hover:text-text-secondary"
           }`}
           aria-pressed={side === "buy"}
@@ -83,9 +83,9 @@ export function OrderPanel({ token, usdcBalance, tokenQty }: OrderPanelProps) {
         </button>
         <button
           onClick={() => setSide("sell")}
-          className={`flex-1 py-2 rounded-md text-sm font-bold transition-colors ${
+          className={`flex-1 py-1.5 rounded text-xs font-bold transition-colors ${
             side === "sell"
-              ? "bg-accent-red/20 text-accent-red border border-accent-red/40"
+              ? "bg-accent-red text-white"
               : "bg-bg-tertiary text-text-muted hover:text-text-secondary"
           }`}
           aria-pressed={side === "sell"}
@@ -94,84 +94,97 @@ export function OrderPanel({ token, usdcBalance, tokenQty }: OrderPanelProps) {
         </button>
       </div>
 
-      {/* Balance Info */}
-      <div className="flex justify-between text-xs text-text-muted mb-3">
-        <span>Paper USDC: {formatUSD(usdcBalance)}</span>
-        <span>{token.symbol}: {tokenQty.toFixed(4)}</span>
+      {/* Market label */}
+      <div className="flex items-center gap-2 mb-2">
+        <span className="text-[10px] font-semibold text-text-primary bg-bg-tertiary px-2 py-0.5 rounded">Market</span>
+        <span className="text-[10px] text-text-muted ml-auto">Bal: {side === "buy" ? formatUSD(usdcBalance) : `${tokenQty.toFixed(4)} ${token.symbol}`}</span>
       </div>
 
       <form onSubmit={handleSubmit}>
         {/* Amount Input */}
-        <div className="mb-3">
-          <label className="text-xs text-text-muted mb-1 block">
-            Amount ({side === "buy" ? "USDC" : token.symbol})
-          </label>
-          <input
-            type="number"
-            step="any"
-            min="0"
-            value={amount}
-            onChange={(e) => setAmount(e.target.value)}
-            placeholder="0.00"
-            className="w-full rounded-md border border-border bg-bg-tertiary px-3 py-2 text-sm font-mono outline-none focus:border-accent-blue"
-            aria-label={`Amount in ${side === "buy" ? "USDC" : token.symbol}`}
-            disabled={!isAuthenticated}
-          />
-          {/* Quick fill buttons */}
-          <div className="flex gap-1 mt-1">
-            {[25, 50, 75, 100].map((pct) => (
+        <div className="mb-2">
+          <div className="flex items-center border border-border rounded bg-bg-tertiary overflow-hidden">
+            <input
+              type="number"
+              step="any"
+              min="0"
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+              placeholder="0.00"
+              className="flex-1 bg-transparent px-2.5 py-2 text-xs font-mono outline-none text-text-primary"
+              aria-label={`Amount in ${side === "buy" ? "USDC" : token.symbol}`}
+              disabled={!isAuthenticated}
+            />
+            <span className="text-[10px] text-text-muted px-2">{side === "buy" ? "USDC" : token.symbol}</span>
+          </div>
+        </div>
+
+        {/* Preset amount buttons */}
+        <div className="flex gap-1 mb-3">
+          {side === "buy" ? (
+            PRESET_AMOUNTS.map((amt) => (
+              <button
+                key={amt}
+                type="button"
+                onClick={() => setAmount(String(amt))}
+                className={`flex-1 text-[10px] py-1 rounded font-medium transition-colors ${
+                  amount === String(amt) ? "bg-accent-green/20 text-accent-green" : "bg-bg-tertiary text-text-muted hover:text-text-secondary"
+                }`}
+              >
+                ${amt}
+              </button>
+            ))
+          ) : (
+            [10, 25, 50, 100].map((pct) => (
               <button
                 key={pct}
                 type="button"
-                onClick={() => {
-                  const max = side === "buy" ? usdcBalance : tokenQty;
-                  setAmount(((max * pct) / 100).toFixed(side === "buy" ? 2 : 6));
-                }}
-                className="flex-1 text-xs py-1 bg-bg-tertiary rounded text-text-muted hover:text-text-primary transition-colors"
+                onClick={() => setAmount(((tokenQty * pct) / 100).toFixed(6))}
+                className="flex-1 text-[10px] py-1 bg-bg-tertiary rounded text-text-muted hover:text-text-secondary font-medium transition-colors"
               >
                 {pct}%
               </button>
-            ))}
-          </div>
+            ))
+          )}
         </div>
 
         {/* Estimates */}
-        <div className="space-y-1 mb-3 text-xs text-text-muted">
+        <div className="space-y-1 mb-3 text-[10px] text-text-muted border-t border-border pt-2">
           <div className="flex justify-between">
             <span>Price</span>
-            <span className="font-mono">{formatPrice(token.price)}</span>
+            <span className="font-mono text-text-secondary">{formatPrice(token.price)}</span>
           </div>
           <div className="flex justify-between">
             <span>Est. Slippage</span>
-            <span className="font-mono">~{estimatedSlippage}%</span>
+            <span className="font-mono text-text-secondary">~{estimatedSlippage}%</span>
           </div>
           <div className="flex justify-between">
             <span>Fee (0.1%)</span>
-            <span className="font-mono">{formatUSD(fee)}</span>
+            <span className="font-mono text-text-secondary">{formatUSD(fee)}</span>
           </div>
           {side === "buy" && parseFloat(amount || "0") > 0 && (
-            <div className="flex justify-between text-text-secondary">
+            <div className="flex justify-between">
               <span>Est. Receive</span>
-              <span className="font-mono">{estimatedQty.toFixed(6)} {token.symbol}</span>
+              <span className="font-mono text-accent-green">{estimatedQty.toFixed(6)} {token.symbol}</span>
             </div>
           )}
           {side === "sell" && parseFloat(amount || "0") > 0 && (
-            <div className="flex justify-between text-text-secondary">
+            <div className="flex justify-between">
               <span>Est. Receive</span>
-              <span className="font-mono">{formatUSD(estimatedCost)}</span>
+              <span className="font-mono text-accent-green">{formatUSD(estimatedCost)}</span>
             </div>
           )}
         </div>
 
-        {error && <div className="text-xs text-accent-red mb-2" role="alert">{error}</div>}
-        {success && <div className="text-xs text-accent-green mb-2" role="status">{success}</div>}
+        {error && <div className="text-[10px] text-accent-red mb-2 px-1" role="alert">{error}</div>}
+        {success && <div className="text-[10px] text-accent-green mb-2 px-1" role="status">{success}</div>}
 
         <button
           type="submit"
           disabled={!isAuthenticated || tradeMutation.isPending}
-          className={`w-full py-2.5 rounded-lg text-sm font-bold transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
+          className={`w-full py-2 rounded text-xs font-bold transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${
             side === "buy"
-              ? "bg-accent-green text-bg-primary hover:bg-accent-green/90"
+              ? "bg-accent-green text-black hover:bg-accent-green/90"
               : "bg-accent-red text-white hover:bg-accent-red/90"
           }`}
         >

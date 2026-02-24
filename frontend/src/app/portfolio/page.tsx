@@ -1,13 +1,17 @@
 "use client";
 
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/context/AuthContext";
 import { api } from "@/lib/api";
 import { formatUSD, formatPnl, formatPercent, formatPrice, formatNumber, timeAgo } from "@/lib/format";
 import Link from "next/link";
 
+type Tab = "holding" | "history";
+
 export default function PortfolioPage() {
   const { isAuthenticated } = useAuth();
+  const [tab, setTab] = useState<Tab>("holding");
 
   const { data: portfolio, isLoading } = useQuery({
     queryKey: ["portfolio"],
@@ -25,9 +29,14 @@ export default function PortfolioPage() {
 
   if (!isAuthenticated) {
     return (
-      <div className="flex flex-col items-center justify-center h-96 gap-4">
-        <h2 className="text-xl font-bold">Connect your wallet to view your portfolio</h2>
-        <p className="text-text-secondary">Use the Connect Wallet button in the navigation bar.</p>
+      <div className="flex flex-col items-center justify-center h-96 gap-3">
+        <div className="h-12 w-12 rounded-full bg-bg-tertiary flex items-center justify-center">
+          <svg className="w-6 h-6 text-text-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M21 12a2.25 2.25 0 00-2.25-2.25H15a3 3 0 11-6 0H5.25A2.25 2.25 0 003 12m18 0v6a2.25 2.25 0 01-2.25 2.25H5.25A2.25 2.25 0 013 18v-6m18 0V9M3 12V9m18 0a2.25 2.25 0 00-2.25-2.25H5.25A2.25 2.25 0 013 9m18 0V6a2.25 2.25 0 00-2.25-2.25H5.25A2.25 2.25 0 013 6v3" />
+          </svg>
+        </div>
+        <span className="text-sm font-semibold">Connect Wallet</span>
+        <span className="text-xs text-text-muted">Connect your wallet to view your portfolio</span>
       </div>
     );
   }
@@ -35,77 +44,120 @@ export default function PortfolioPage() {
   if (isLoading || !portfolio) {
     return (
       <div className="flex items-center justify-center h-96">
-        <div className="text-text-muted">Loading portfolio...</div>
+        <div className="flex flex-col items-center gap-3">
+          <div className="h-6 w-6 border-2 border-accent-green border-t-transparent rounded-full animate-spin" />
+          <div className="text-text-muted text-xs">Loading portfolio...</div>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="py-6">
-      <h1 className="text-2xl font-bold mb-6">Portfolio</h1>
+    <div className="pt-2 pb-6">
+      {/* Top: Balance Overview + Stats */}
+      <div className="grid grid-cols-1 lg:grid-cols-[1fr_1fr] gap-3 mb-4">
+        {/* Left: Wallet Balance */}
+        <div className="rounded border border-border bg-bg-card p-4">
+          <div className="text-[10px] text-text-muted uppercase tracking-wider mb-1">Total Balance</div>
+          <div className="text-2xl font-bold font-mono text-text-primary">{formatUSD(portfolio.totalValue)}</div>
+          <div className="flex items-center gap-4 mt-2">
+            <div>
+              <span className="text-[10px] text-text-muted">Paper USDC</span>
+              <div className="text-sm font-mono text-text-primary">{formatUSD(portfolio.usdcBalance)}</div>
+            </div>
+            <div>
+              <span className="text-[10px] text-text-muted">Positions</span>
+              <div className="text-sm font-mono text-text-primary">{portfolio.positions.length}</div>
+            </div>
+          </div>
+        </div>
 
-      {/* Summary Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-        <SummaryCard label="Total Value" value={formatUSD(portfolio.totalValue)} />
-        <SummaryCard
-          label="24h P&L"
-          value={formatPnl(portfolio.pnl24h)}
-          color={portfolio.pnl24h >= 0 ? "green" : "red"}
-        />
-        <SummaryCard
-          label="Overall P&L"
-          value={formatPnl(portfolio.overallPnl)}
-          color={portfolio.overallPnl >= 0 ? "green" : "red"}
-        />
-        <SummaryCard
-          label="ROI"
-          value={formatPercent(portfolio.roi)}
-          color={portfolio.roi >= 0 ? "green" : "red"}
-        />
-      </div>
+        {/* Right: PnL Stats */}
+        <div className="rounded border border-border bg-bg-card p-4">
+          <div className="grid grid-cols-3 gap-3">
+            <div>
+              <span className="text-[10px] text-text-muted">Total PnL</span>
+              <div className={`text-sm font-bold font-mono ${portfolio.overallPnl >= 0 ? "text-accent-green" : "text-accent-red"}`}>
+                {formatPnl(portfolio.overallPnl)}
+              </div>
+            </div>
+            <div>
+              <span className="text-[10px] text-text-muted">24h PnL</span>
+              <div className={`text-sm font-bold font-mono ${portfolio.pnl24h >= 0 ? "text-accent-green" : "text-accent-red"}`}>
+                {formatPnl(portfolio.pnl24h)}
+              </div>
+            </div>
+            <div>
+              <span className="text-[10px] text-text-muted">ROI</span>
+              <div className={`text-sm font-bold font-mono ${portfolio.roi >= 0 ? "text-accent-green" : "text-accent-red"}`}>
+                {formatPercent(portfolio.roi)}
+              </div>
+            </div>
+          </div>
 
-      {/* USDC Balance */}
-      <div className="mb-8 rounded-lg border border-border bg-bg-secondary p-4">
-        <div className="flex items-center justify-between">
-          <span className="text-sm text-text-secondary">Paper USDC Balance</span>
-          <span className="text-lg font-bold font-mono">{formatUSD(portfolio.usdcBalance)}</span>
+          {/* Unrealized PnL bar */}
+          <div className="mt-3 pt-3 border-t border-border">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] text-text-muted">Unrealized Profits</span>
+              <span className={`text-xs font-bold font-mono ${portfolio.overallPnl >= 0 ? "text-accent-green" : "text-accent-red"}`}>
+                {formatPnl(portfolio.overallPnl)}
+              </span>
+            </div>
+          </div>
         </div>
       </div>
 
-      {/* Open Positions */}
-      <section className="mb-8">
-        <h2 className="text-lg font-bold mb-3">Open Positions</h2>
-        {portfolio.positions.length === 0 ? (
-          <div className="rounded-lg border border-border bg-bg-secondary p-8 text-center text-text-muted">
-            No open positions. Search for a token to start trading.
-          </div>
-        ) : (
-          <div className="rounded-lg border border-border bg-bg-secondary overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm" aria-label="Open positions">
+      {/* Tab Bar */}
+      <div className="flex items-center gap-0 border-b border-border mb-3">
+        {(["holding", "history"] as Tab[]).map((t) => (
+          <button
+            key={t}
+            onClick={() => setTab(t)}
+            className={`px-4 py-2 text-xs font-semibold transition-colors border-b-2 ${
+              tab === t
+                ? "border-accent-green text-text-primary"
+                : "border-transparent text-text-muted hover:text-text-secondary"
+            }`}
+          >
+            {t === "holding" ? `Holding (${portfolio.positions.length})` : `History (${tradesData?.trades?.length || 0})`}
+          </button>
+        ))}
+      </div>
+
+      {/* Tab Content */}
+      {tab === "holding" ? (
+        <div>
+          {portfolio.positions.length === 0 ? (
+            <div className="rounded border border-border bg-bg-card p-8 text-center">
+              <div className="text-text-muted text-xs">No open positions</div>
+              <Link href="/" className="text-[10px] text-accent-green hover:underline mt-1 inline-block">Browse tokens →</Link>
+            </div>
+          ) : (
+            <div className="rounded border border-border bg-bg-card overflow-hidden">
+              <table className="w-full text-[11px]" aria-label="Open positions">
                 <thead>
-                  <tr className="border-b border-border bg-bg-tertiary/50">
-                    <th className="text-left px-4 py-3 text-xs font-semibold text-text-muted">Token</th>
-                    <th className="text-right px-4 py-3 text-xs font-semibold text-text-muted">Qty</th>
-                    <th className="text-right px-4 py-3 text-xs font-semibold text-text-muted">Avg Entry</th>
-                    <th className="text-right px-4 py-3 text-xs font-semibold text-text-muted">Current Price</th>
-                    <th className="text-right px-4 py-3 text-xs font-semibold text-text-muted">Value</th>
-                    <th className="text-right px-4 py-3 text-xs font-semibold text-text-muted">Unrealized P&L</th>
+                  <tr className="border-b border-border bg-bg-secondary">
+                    <th className="text-left px-3 py-2 text-[10px] font-semibold text-text-muted">Token</th>
+                    <th className="text-right px-3 py-2 text-[10px] font-semibold text-text-muted">Qty</th>
+                    <th className="text-right px-3 py-2 text-[10px] font-semibold text-text-muted">Avg Entry</th>
+                    <th className="text-right px-3 py-2 text-[10px] font-semibold text-text-muted">Price</th>
+                    <th className="text-right px-3 py-2 text-[10px] font-semibold text-text-muted">Value</th>
+                    <th className="text-right px-3 py-2 text-[10px] font-semibold text-text-muted">PnL</th>
                   </tr>
                 </thead>
                 <tbody>
                   {portfolio.positions.map((pos) => (
-                    <tr key={pos.mint} className="border-b border-border/50 hover:bg-bg-tertiary/30 transition-colors">
-                      <td className="px-4 py-3">
-                        <Link href={`/token/${pos.mint}`} className="text-accent-blue hover:underline font-mono text-xs">
-                          {pos.mint.slice(0, 8)}...
+                    <tr key={pos.mint} className="border-b border-border/30 hover:bg-bg-tertiary/20 transition-colors">
+                      <td className="px-3 py-2">
+                        <Link href={`/token/${pos.mint}`} className="text-accent-blue hover:underline font-mono">
+                          {pos.mint.slice(0, 6)}..{pos.mint.slice(-4)}
                         </Link>
                       </td>
-                      <td className="text-right px-4 py-3 font-mono">{formatNumber(pos.qty, 4)}</td>
-                      <td className="text-right px-4 py-3 font-mono">{formatPrice(pos.avgEntryPrice)}</td>
-                      <td className="text-right px-4 py-3 font-mono">{formatPrice(pos.currentPrice)}</td>
-                      <td className="text-right px-4 py-3 font-mono">{formatUSD(pos.value)}</td>
-                      <td className={`text-right px-4 py-3 font-mono font-bold ${pos.unrealizedPnl >= 0 ? "text-accent-green" : "text-accent-red"}`}>
+                      <td className="text-right px-3 py-2 font-mono">{formatNumber(pos.qty, 4)}</td>
+                      <td className="text-right px-3 py-2 font-mono text-text-secondary">{formatPrice(pos.avgEntryPrice)}</td>
+                      <td className="text-right px-3 py-2 font-mono">{formatPrice(pos.currentPrice)}</td>
+                      <td className="text-right px-3 py-2 font-mono">{formatUSD(pos.value)}</td>
+                      <td className={`text-right px-3 py-2 font-mono font-bold ${pos.unrealizedPnl >= 0 ? "text-accent-green" : "text-accent-red"}`}>
                         {formatPnl(pos.unrealizedPnl)}
                       </td>
                     </tr>
@@ -113,76 +165,62 @@ export default function PortfolioPage() {
                 </tbody>
               </table>
             </div>
-          </div>
-        )}
-      </section>
-
-      {/* Trade History */}
-      <section>
-        <h2 className="text-lg font-bold mb-3">Trade History</h2>
-        {!tradesData?.trades || tradesData.trades.length === 0 ? (
-          <div className="rounded-lg border border-border bg-bg-secondary p-8 text-center text-text-muted">
-            No trades yet.
-          </div>
-        ) : (
-          <div className="rounded-lg border border-border bg-bg-secondary overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm" aria-label="Trade history">
+          )}
+        </div>
+      ) : (
+        <div>
+          {!tradesData?.trades || tradesData.trades.length === 0 ? (
+            <div className="rounded border border-border bg-bg-card p-8 text-center text-text-muted text-xs">
+              No trades yet.
+            </div>
+          ) : (
+            <div className="rounded border border-border bg-bg-card overflow-hidden">
+              <table className="w-full text-[11px]" aria-label="Trade history">
                 <thead>
-                  <tr className="border-b border-border bg-bg-tertiary/50">
-                    <th className="text-left px-4 py-3 text-xs font-semibold text-text-muted">Time</th>
-                    <th className="text-left px-4 py-3 text-xs font-semibold text-text-muted">Token</th>
-                    <th className="text-left px-4 py-3 text-xs font-semibold text-text-muted">Side</th>
-                    <th className="text-right px-4 py-3 text-xs font-semibold text-text-muted">Qty</th>
-                    <th className="text-right px-4 py-3 text-xs font-semibold text-text-muted">Price</th>
-                    <th className="text-right px-4 py-3 text-xs font-semibold text-text-muted">Total (USDC)</th>
-                    <th className="text-right px-4 py-3 text-xs font-semibold text-text-muted">Fee</th>
+                  <tr className="border-b border-border bg-bg-secondary">
+                    <th className="text-left px-3 py-2 text-[10px] font-semibold text-text-muted">Time</th>
+                    <th className="text-left px-3 py-2 text-[10px] font-semibold text-text-muted">Token</th>
+                    <th className="text-left px-3 py-2 text-[10px] font-semibold text-text-muted">Side</th>
+                    <th className="text-right px-3 py-2 text-[10px] font-semibold text-text-muted">Qty</th>
+                    <th className="text-right px-3 py-2 text-[10px] font-semibold text-text-muted">Price</th>
+                    <th className="text-right px-3 py-2 text-[10px] font-semibold text-text-muted">Total</th>
+                    <th className="text-right px-3 py-2 text-[10px] font-semibold text-text-muted">Fee</th>
                   </tr>
                 </thead>
                 <tbody>
                   {tradesData.trades.map((trade) => (
-                    <tr key={trade.id} className="border-b border-border/50 hover:bg-bg-tertiary/30 transition-colors">
-                      <td className="px-4 py-3 text-text-muted text-xs">{timeAgo(trade.timestamp)}</td>
-                      <td className="px-4 py-3">
-                        <Link href={`/token/${trade.mint}`} className="text-accent-blue hover:underline font-mono text-xs">
-                          {trade.mint.slice(0, 8)}...
+                    <tr key={trade.id} className="border-b border-border/30 hover:bg-bg-tertiary/20 transition-colors">
+                      <td className="px-3 py-2 text-text-muted">{timeAgo(trade.timestamp)}</td>
+                      <td className="px-3 py-2">
+                        <Link href={`/token/${trade.mint}`} className="text-accent-blue hover:underline font-mono">
+                          {trade.mint.slice(0, 6)}..{trade.mint.slice(-4)}
                         </Link>
                       </td>
-                      <td className="px-4 py-3">
-                        <span className={`text-xs font-bold px-2 py-0.5 rounded ${
+                      <td className="px-3 py-2">
+                        <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${
                           trade.side === "buy"
-                            ? "bg-accent-green/20 text-accent-green"
-                            : "bg-accent-red/20 text-accent-red"
+                            ? "bg-accent-green/15 text-accent-green"
+                            : "bg-accent-red/15 text-accent-red"
                         }`}>
                           {trade.side.toUpperCase()}
                         </span>
                       </td>
-                      <td className="text-right px-4 py-3 font-mono">{formatNumber(trade.qty, 4)}</td>
-                      <td className="text-right px-4 py-3 font-mono">{formatPrice(trade.price)}</td>
-                      <td className={`text-right px-4 py-3 font-mono font-semibold ${
+                      <td className="text-right px-3 py-2 font-mono">{formatNumber(trade.qty, 4)}</td>
+                      <td className="text-right px-3 py-2 font-mono text-text-secondary">{formatPrice(trade.price)}</td>
+                      <td className={`text-right px-3 py-2 font-mono font-semibold ${
                         trade.side === "buy" ? "text-accent-red" : "text-accent-green"
                       }`}>
                         {trade.side === "buy" ? "-" : "+"}{formatUSD(trade.qty * trade.price)}
                       </td>
-                      <td className="text-right px-4 py-3 font-mono text-text-muted">{formatUSD(trade.fee)}</td>
+                      <td className="text-right px-3 py-2 font-mono text-text-muted">{formatUSD(trade.fee)}</td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
-          </div>
-        )}
-      </section>
-    </div>
-  );
-}
-
-function SummaryCard({ label, value, color }: { label: string; value: string; color?: "green" | "red" }) {
-  const colorClass = color === "green" ? "text-accent-green" : color === "red" ? "text-accent-red" : "text-text-primary";
-  return (
-    <div className="rounded-lg border border-border bg-bg-secondary p-4">
-      <div className="text-xs text-text-muted mb-1">{label}</div>
-      <div className={`text-lg font-bold font-mono ${colorClass}`}>{value}</div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

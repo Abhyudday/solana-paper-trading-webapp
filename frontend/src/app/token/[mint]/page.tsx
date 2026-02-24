@@ -7,14 +7,14 @@ import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { wsClient } from "@/lib/ws";
-import { formatPrice, formatCompact, formatNumber } from "@/lib/format";
+import { formatPrice, formatCompact, formatNumber, shortenAddress } from "@/lib/format";
 import { OrderPanel } from "@/components/OrderPanel";
 import { Transactions } from "@/components/OrderBook";
 
 const Chart = dynamic(() => import("@/components/Chart").then((m) => m.Chart), {
   ssr: false,
   loading: () => (
-    <div className="flex items-center justify-center h-[400px] text-text-muted">Loading chart...</div>
+    <div className="flex items-center justify-center h-[400px] text-text-muted text-xs">Loading chart...</div>
   ),
 });
 
@@ -65,7 +65,7 @@ export default function TokenPage() {
     if (!tokenInfo && !tokenLoading && !tokenFetching) {
       return (
         <div className="flex items-center justify-center h-96">
-          <div className="text-text-muted">Token not found</div>
+          <div className="text-text-muted text-sm">Token not found</div>
         </div>
       );
     }
@@ -73,8 +73,8 @@ export default function TokenPage() {
       return (
         <div className="flex items-center justify-center h-96">
           <div className="flex flex-col items-center gap-3">
-            <div className="h-8 w-8 border-2 border-accent-blue border-t-transparent rounded-full animate-spin" />
-            <div className="text-text-muted text-sm">Loading token data...</div>
+            <div className="h-6 w-6 border-2 border-accent-green border-t-transparent rounded-full animate-spin" />
+            <div className="text-text-muted text-xs">Loading...</div>
           </div>
         </div>
       );
@@ -82,94 +82,122 @@ export default function TokenPage() {
   }
 
   return (
-    <div className="py-6">
-      {/* Token Header */}
-      <div className="flex items-center gap-4 mb-6">
-        {tokenInfo.image && (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={tokenInfo.image}
-            alt={tokenInfo.symbol}
-            className="h-10 w-10 rounded-full object-cover"
-            onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
-          />
-        )}
-        <div>
-          <h1 className="text-2xl font-bold flex items-center gap-2">
-            {tokenInfo.symbol}
-            <span className="text-sm text-text-muted font-normal">{tokenInfo.name}</span>
-          </h1>
-          <div className="flex items-center gap-4 text-sm text-text-secondary">
-            <span className="font-mono text-lg font-bold text-text-primary">
-              {formatPrice(tokenInfo.price)}
-            </span>
-            <span>MCap: {formatCompact(tokenInfo.marketCap)}</span>
-            <span>Liq: {formatCompact(tokenInfo.liquidity)}</span>
-            {tokenInfo.volume24h !== undefined && (
-              <span>Vol 24h: {formatCompact(tokenInfo.volume24h)}</span>
-            )}
+    <div className="pt-2 pb-6">
+      {/* Token Header Bar */}
+      <div className="flex items-center gap-3 mb-2 pb-2 border-b border-border">
+        {/* Token identity */}
+        <div className="flex items-center gap-2">
+          {tokenInfo.image ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={tokenInfo.image}
+              alt={tokenInfo.symbol}
+              className="h-8 w-8 rounded-full object-cover ring-1 ring-border"
+              onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+            />
+          ) : (
+            <div className="h-8 w-8 rounded-full bg-bg-tertiary flex items-center justify-center text-xs font-bold text-text-muted ring-1 ring-border">
+              {tokenInfo.symbol?.charAt(0)}
+            </div>
+          )}
+          <div>
+            <div className="flex items-center gap-1.5">
+              <span className="font-bold text-sm">{tokenInfo.symbol}</span>
+              <span className="text-[10px] text-text-muted">{tokenInfo.name}</span>
+            </div>
+            <span className="text-[9px] font-mono text-text-muted">{shortenAddress(mint, 6)}</span>
           </div>
+        </div>
+
+        {/* Stats bar */}
+        <div className="flex items-center gap-4 ml-auto">
+          <StatItem label="Price" value={formatPrice(tokenInfo.price)} highlight />
+          <StatItem label="Liq" value={formatCompact(tokenInfo.liquidity)} />
+          <StatItem label="24h Vol" value={formatCompact(tokenInfo.volume24h || 0)} />
+          <StatItem label="MCap" value={formatCompact(tokenInfo.marketCap)} />
+          <StatItem label="Supply" value={formatNumber(tokenInfo.supply, 0)} />
         </div>
       </div>
 
       {/* Main Grid: Chart + Order Panel */}
-      <div className="grid grid-cols-1 lg:grid-cols-[1fr_340px] gap-4 mb-4">
-        {/* Chart */}
-        <div className="rounded-lg border border-border bg-bg-primary overflow-hidden">
-          <div className="flex items-center gap-2 px-4 py-3 border-b border-border bg-bg-secondary">
-            {(["1d", "7d", "30d"] as ChartRange[]).map((r) => (
-              <button
-                key={r}
-                onClick={() => setRange(r)}
-                className={`px-3 py-1 rounded text-xs font-bold transition-colors ${
-                  range === r
-                    ? "bg-accent-blue text-white"
-                    : "bg-bg-tertiary text-text-muted hover:text-text-primary"
-                }`}
-                aria-pressed={range === r}
-              >
-                {r.toUpperCase()}
-              </button>
-            ))}
-          </div>
-          {chartData?.bars && chartData.bars.length > 0 ? (
-            <Chart data={chartData.bars} height={420} />
-          ) : (
-            <div className="flex items-center justify-center h-[420px] text-text-muted bg-bg-primary">
-              {chartLoading ? "Loading chart..." : "No chart data available"}
+      <div className="grid grid-cols-1 lg:grid-cols-[1fr_300px] gap-2">
+        {/* Left: Chart area */}
+        <div className="flex flex-col gap-2">
+          {/* Chart */}
+          <div className="rounded border border-border bg-bg-primary overflow-hidden">
+            {/* Timeframe bar */}
+            <div className="flex items-center gap-1 px-3 py-1.5 border-b border-border bg-bg-secondary">
+              {(["1d", "7d", "30d"] as ChartRange[]).map((r) => (
+                <button
+                  key={r}
+                  onClick={() => setRange(r)}
+                  className={`px-2.5 py-1 rounded text-[10px] font-bold transition-colors ${
+                    range === r
+                      ? "bg-accent-green/20 text-accent-green"
+                      : "text-text-muted hover:text-text-primary hover:bg-bg-tertiary"
+                  }`}
+                  aria-pressed={range === r}
+                >
+                  {r.toUpperCase()}
+                </button>
+              ))}
+              <div className="ml-auto flex items-center gap-2 text-[10px] text-text-muted">
+                <span>Price / MC</span>
+                <span>USD / SOL</span>
+              </div>
             </div>
-          )}
+            {chartData?.bars && chartData.bars.length > 0 ? (
+              <Chart data={chartData.bars} height={380} />
+            ) : (
+              <div className="flex items-center justify-center h-[380px] text-text-muted bg-bg-primary text-xs">
+                {chartLoading ? "Loading chart..." : "No chart data available"}
+              </div>
+            )}
+          </div>
+
+          {/* Transactions */}
+          <Transactions mint={mint} />
         </div>
 
-        {/* Order Panel */}
-        <OrderPanel token={tokenInfo} usdcBalance={usdcBalance} tokenQty={tokenQty} />
-      </div>
+        {/* Right: Order Panel + Token Details */}
+        <div className="flex flex-col gap-2">
+          <OrderPanel token={tokenInfo} usdcBalance={usdcBalance} tokenQty={tokenQty} />
 
-      {/* Transactions */}
-      <Transactions mint={mint} />
-
-      {/* Token Details */}
-      <div className="mt-4 rounded-lg border border-border bg-bg-secondary p-4">
-        <h3 className="text-sm font-bold mb-3">Token Details</h3>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-          <div>
-            <div className="text-text-muted text-xs">Mint</div>
-            <div className="font-mono text-xs truncate" title={tokenInfo.mint}>{tokenInfo.mint}</div>
-          </div>
-          <div>
-            <div className="text-text-muted text-xs">Decimals</div>
-            <div>{tokenInfo.decimals}</div>
-          </div>
-          <div>
-            <div className="text-text-muted text-xs">Supply</div>
-            <div>{formatNumber(tokenInfo.supply, 0)}</div>
-          </div>
-          <div>
-            <div className="text-text-muted text-xs">Liquidity</div>
-            <div>{formatCompact(tokenInfo.liquidity)}</div>
+          {/* Token Details card */}
+          <div className="rounded border border-border bg-bg-card p-3">
+            <h3 className="text-[10px] font-semibold text-text-muted uppercase tracking-wider mb-2">Token Info</h3>
+            <div className="grid grid-cols-2 gap-2 text-[10px]">
+              <div>
+                <span className="text-text-muted">Mint</span>
+                <div className="font-mono text-text-secondary truncate" title={tokenInfo.mint}>{shortenAddress(tokenInfo.mint, 6)}</div>
+              </div>
+              <div>
+                <span className="text-text-muted">Decimals</span>
+                <div className="text-text-secondary">{tokenInfo.decimals}</div>
+              </div>
+              <div>
+                <span className="text-text-muted">Supply</span>
+                <div className="text-text-secondary">{formatNumber(tokenInfo.supply, 0)}</div>
+              </div>
+              <div>
+                <span className="text-text-muted">Liquidity</span>
+                <div className="text-text-secondary">{formatCompact(tokenInfo.liquidity)}</div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+function StatItem({ label, value, highlight }: { label: string; value: string; highlight?: boolean }) {
+  return (
+    <div className="flex flex-col items-center">
+      <span className="text-[9px] text-text-muted uppercase">{label}</span>
+      <span className={`text-[11px] font-mono font-semibold ${highlight ? "text-accent-green" : "text-text-primary"}`}>
+        {value}
+      </span>
     </div>
   );
 }
