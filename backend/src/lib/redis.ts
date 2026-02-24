@@ -8,16 +8,25 @@ function isValidRedisUrl(url: string): boolean {
     new URL(url);
     return true;
   } catch {
-    return url === "redis://localhost:6379";
+    return false;
   }
 }
 
 const redisUrl = config.REDIS_URL;
 const redisAvailable = isValidRedisUrl(redisUrl);
 
+// Log sanitized URL for debugging (mask password)
+try {
+  const u = new URL(redisUrl);
+  if (u.password) u.password = "****";
+  console.log(`Redis URL: ${u.toString()} (available: ${redisAvailable})`);
+} catch {
+  console.log(`Redis URL: ${redisUrl} (available: ${redisAvailable})`);
+}
+
 function createRedisClient(label: string): Redis {
   if (!redisAvailable) {
-    console.warn(`[${label}] Redis URL not configured ("${redisUrl}"), creating offline client`);
+    console.warn(`[${label}] Redis not configured, creating offline client`);
     const client = new Redis({ lazyConnect: true, enableOfflineQueue: false });
     client.on("error", () => {}); // suppress errors
     return client;
@@ -26,18 +35,24 @@ function createRedisClient(label: string): Redis {
   const client = new Redis(redisUrl, {
     maxRetriesPerRequest: 3,
     retryStrategy(times) {
-      if (times > 10) return null; // stop retrying after 10 attempts
-      return Math.min(times * 500, 5000);
+      if (times > 5) return null; // stop retrying after 5 attempts
+      return Math.min(times * 500, 3000);
     },
-    reconnectOnError() {
+    reconnectOnError(err) {
+      // Do NOT reconnect on auth errors — it will just loop forever
+      if (err.message.includes("NOAUTH")) return false;
       return true;
     },
     lazyConnect: true,
-    enableReadyCheck: false, // Disable INFO command that requires auth
-    showFriendlyErrorStack: true,
+    enableReadyCheck: false,
   });
 
   client.on("error", (err) => {
+    if (err.message.includes("NOAUTH")) {
+      console.error(`[${label}] Redis NOAUTH — password missing or wrong in REDIS_URL. Disconnecting.`);
+      client.disconnect();
+      return;
+    }
     console.error(`[${label}] Redis error:`, err.message);
   });
   client.on("connect", () => {
@@ -60,12 +75,18 @@ export async function connectRedis(): Promise<boolean> {
   }
   try {
     await Promise.all([redis.connect(), redisSub.connect(), redisPub.connect()]);
+    // Quick ping to verify auth works
+    await redis.ping();
     redisConnected = true;
-    console.log("All Redis clients connected successfully");
+    console.log("All Redis clients connected and authenticated successfully");
     return true;
   } catch (err: any) {
     console.error("Failed to connect to Redis:", err.message);
     console.warn("Continuing without Redis. Caching and pub/sub are disabled.");
+    // Disconnect all clients to stop retry loops
+    redis.disconnect();
+    redisSub.disconnect();
+    redisPub.disconnect();
     redisConnected = false;
     return false;
   }
