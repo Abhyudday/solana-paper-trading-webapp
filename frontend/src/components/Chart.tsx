@@ -138,6 +138,13 @@ export function Chart({ data, height = 400 }: ChartProps) {
       volumeSeries.setData(volumeData);
       priceChart.timeScale().fitContent();
       volChart.timeScale().fitContent();
+
+      // Cap bar width so new tokens with few bars don't show huge candles
+      const MAX_BAR_SPACING = 10;
+      if (filtered.length < 60) {
+        priceChart.timeScale().applyOptions({ barSpacing: MAX_BAR_SPACING, rightOffset: 5 });
+        volChart.timeScale().applyOptions({ barSpacing: MAX_BAR_SPACING, rightOffset: 5 });
+      }
     }
 
     // Sync time scales between the two charts

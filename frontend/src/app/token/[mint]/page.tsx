@@ -26,21 +26,23 @@ export default function TokenPage() {
   const { isAuthenticated } = useAuth();
   const [range, setRange] = useState<ChartRange>("1d");
 
-  const { data: tokenInfo, isLoading: tokenLoading, isFetching: tokenFetching } = useQuery({
+  const { data: tokenInfo, isLoading: tokenLoading } = useQuery({
     queryKey: ["token", mint],
     queryFn: () => api.market.getToken(mint),
     enabled: !!mint,
     refetchInterval: 5000,
-    staleTime: 10000,
-    retry: 2,
+    staleTime: 30000,
+    retry: 3,
+    retryDelay: 1000,
   });
 
+  // Start chart fetch immediately (don't wait for tokenInfo)
   const { data: chartData, isLoading: chartLoading } = useQuery({
     queryKey: ["chart", mint, range],
     queryFn: () => api.market.getChart(mint, range),
-    enabled: !!mint && !!tokenInfo,
+    enabled: !!mint,
     refetchInterval: 10000,
-    staleTime: 15000,
+    staleTime: 30000,
   });
 
   const { data: portfolio } = useQuery({
@@ -61,15 +63,9 @@ export default function TokenPage() {
   const position = portfolio?.positions.find((p) => p.mint === mint);
   const tokenQty = position?.qty ?? 0;
 
-  if (tokenLoading || tokenFetching || !tokenInfo) {
-    if (!tokenInfo && !tokenLoading && !tokenFetching) {
-      return (
-        <div className="flex items-center justify-center h-96">
-          <div className="text-text-muted text-sm">Token not found</div>
-        </div>
-      );
-    }
-    if (!tokenInfo) {
+  // Show spinner only on first load with no cached data
+  if (!tokenInfo) {
+    if (tokenLoading) {
       return (
         <div className="flex items-center justify-center h-96">
           <div className="flex flex-col items-center gap-3">
@@ -79,6 +75,12 @@ export default function TokenPage() {
         </div>
       );
     }
+    // Query finished but no data → truly not found
+    return (
+      <div className="flex items-center justify-center h-96">
+        <div className="text-text-muted text-sm">Token not found</div>
+      </div>
+    );
   }
 
   return (

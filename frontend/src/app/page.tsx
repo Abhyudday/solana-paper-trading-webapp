@@ -57,7 +57,12 @@ function TokenCard({ token }: { token: DisplayToken }) {
     queryClient.prefetchQuery({
       queryKey: ["token", token.mint],
       queryFn: () => api.market.getToken(token.mint),
-      staleTime: 10000,
+      staleTime: 30000,
+    });
+    queryClient.prefetchQuery({
+      queryKey: ["chart", token.mint, "1d"],
+      queryFn: () => api.market.getChart(token.mint, "1d"),
+      staleTime: 30000,
     });
   }, [queryClient, token.mint]);
 
