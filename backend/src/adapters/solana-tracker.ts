@@ -227,7 +227,7 @@ export class SolanaTrackerAdapter implements MarketDataAdapter {
     const cached = await safeGet(cacheKey);
     if (cached) {
       const parsed = JSON.parse(cached) as TokenInfo[];
-      memCache.set(cacheKey, parsed, 2);
+      memCache.set(cacheKey, parsed, 1);
       return parsed.slice(0, limit);
     }
 
@@ -262,7 +262,7 @@ export class SolanaTrackerAdapter implements MarketDataAdapter {
           };
         });
 
-      memCache.set(cacheKey, tokens, 2);
+      memCache.set(cacheKey, tokens, 1);
       await safeSet(cacheKey, JSON.stringify(tokens), "EX", 10);
       return tokens;
     } catch {
@@ -280,7 +280,7 @@ export class SolanaTrackerAdapter implements MarketDataAdapter {
     const cached = await safeGet(cacheKey);
     if (cached) {
       const parsed = JSON.parse(cached) as TokenInfo[];
-      memCache.set(cacheKey, parsed, 2);
+      memCache.set(cacheKey, parsed, 1);
       return parsed.slice(0, limit);
     }
 
@@ -315,7 +315,7 @@ export class SolanaTrackerAdapter implements MarketDataAdapter {
           };
         });
 
-      memCache.set(cacheKey, tokens, 2);
+      memCache.set(cacheKey, tokens, 1);
       await safeSet(cacheKey, JSON.stringify(tokens), "EX", 10);
       return tokens;
     } catch {
@@ -378,7 +378,7 @@ export class SolanaTrackerAdapter implements MarketDataAdapter {
     const cached = await safeGet(cacheKey);
     if (cached) {
       const parsed = JSON.parse(cached) as TokenInfo[];
-      memCache.set(cacheKey, parsed, 2);
+      memCache.set(cacheKey, parsed, 1);
       return parsed.slice(0, limit);
     }
 
@@ -414,8 +414,8 @@ export class SolanaTrackerAdapter implements MarketDataAdapter {
         });
 
       if (tokens.length > 0) {
-        memCache.set(cacheKey, tokens, 2);
-        await safeSet(cacheKey, JSON.stringify(tokens), "EX", 10);
+        memCache.set(cacheKey, tokens, 1);
+        await safeSet(cacheKey, JSON.stringify(tokens), "EX", 5);
       }
       return tokens;
     } catch {
@@ -433,7 +433,7 @@ export class SolanaTrackerAdapter implements MarketDataAdapter {
     const cached = await safeGet(cacheKey);
     if (cached) {
       const parsed = JSON.parse(cached) as TokenInfo[];
-      memCache.set(cacheKey, parsed, 2);
+      memCache.set(cacheKey, parsed, 1);
       return parsed.slice(0, limit);
     }
 
@@ -469,8 +469,8 @@ export class SolanaTrackerAdapter implements MarketDataAdapter {
         });
 
       if (tokens.length > 0) {
-        memCache.set(cacheKey, tokens, 2);
-        await safeSet(cacheKey, JSON.stringify(tokens), "EX", 10);
+        memCache.set(cacheKey, tokens, 1);
+        await safeSet(cacheKey, JSON.stringify(tokens), "EX", 5);
       }
       return tokens;
     } catch {

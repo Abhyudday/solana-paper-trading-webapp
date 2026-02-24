@@ -82,8 +82,8 @@ async function main() {
     await warmup();
     console.log("Cache warmup complete");
 
-    // Continuous background refresh every 3s so cache is always warm
-    setInterval(warmup, 3_000);
+    // Continuous background refresh every 1.5s so cache is always warm
+    setInterval(warmup, 1_500);
   } catch (err) {
     app.log.error(err);
     process.exit(1);
