@@ -69,7 +69,7 @@ function TokenCard({ token, isNew }: { token: DisplayToken; isNew?: boolean }) {
   return (
     <Link
       href={`/token/${token.mint}`}
-      className={`block rounded border border-border bg-bg-card p-2.5 hover:border-accent-green/40 transition-all group overflow-hidden ${isNew ? "token-card-enter" : ""}`}
+      className={`block rounded border border-border bg-bg-card p-2.5 hover:border-accent-green/40 transition-colors group ${isNew ? "token-card-enter" : ""}`}
       onMouseEnter={handlePrefetch}
     >
       <div className="flex items-start gap-2.5">
