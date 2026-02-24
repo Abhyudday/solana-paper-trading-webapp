@@ -275,6 +275,11 @@ export default function LandingPage() {
   });
   const [filterOpen, setFilterOpen] = useState<ColumnId | null>(null);
 
+  // Refs to hold last non-empty token arrays — guarantees columns never go blank
+  const lastLatestRef = useRef<TokenInfo[]>([]);
+  const lastGraduatingRef = useRef<TokenInfo[]>([]);
+  const lastGraduatedRef = useRef<TokenInfo[]>([]);
+
   // Default (unfiltered) queries
   const { data: latestData, isLoading: latestLoading } = useQuery({
     queryKey: ["latestTokens"],
@@ -299,6 +304,17 @@ export default function LandingPage() {
     staleTime: 1_000,
     placeholderData: keepPreviousData,
   });
+
+  // Stabilize token arrays: never pass [] if we had data before
+  const rawLatest = latestData?.tokens || [];
+  const rawGraduating = graduatingData?.tokens || [];
+  const rawGraduated = graduatedData?.tokens || [];
+  if (rawLatest.length > 0) lastLatestRef.current = rawLatest;
+  if (rawGraduating.length > 0) lastGraduatingRef.current = rawGraduating;
+  if (rawGraduated.length > 0) lastGraduatedRef.current = rawGraduated;
+  const stableLatest = rawLatest.length > 0 ? rawLatest : lastLatestRef.current;
+  const stableGraduating = rawGraduating.length > 0 ? rawGraduating : lastGraduatingRef.current;
+  const stableGraduated = rawGraduated.length > 0 ? rawGraduated : lastGraduatedRef.current;
 
   // Filtered queries — only enabled when filters are active
   const newHasFilters = countActiveFilters(columnFilters.new) > 0;
@@ -343,7 +359,7 @@ export default function LandingPage() {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
         <TokenColumn
           title="New"
-          defaultTokens={latestData?.tokens || []}
+          defaultTokens={stableLatest}
           filteredTokens={filteredNew?.tokens}
           isLoading={latestLoading}
           isFilterLoading={filteredNewLoading}
@@ -353,7 +369,7 @@ export default function LandingPage() {
         />
         <TokenColumn
           title="Migrating"
-          defaultTokens={graduatingData?.tokens || []}
+          defaultTokens={stableGraduating}
           filteredTokens={filteredMigrating?.tokens}
           isLoading={graduatingLoading}
           isFilterLoading={filteredMigratingLoading}
@@ -363,7 +379,7 @@ export default function LandingPage() {
         />
         <TokenColumn
           title="Migrated"
-          defaultTokens={graduatedData?.tokens || []}
+          defaultTokens={stableGraduated}
           filteredTokens={filteredMigrated?.tokens}
           isLoading={graduatedLoading}
           isFilterLoading={filteredMigratedLoading}

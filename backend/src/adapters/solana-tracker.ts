@@ -266,6 +266,8 @@ export class SolanaTrackerAdapter implements MarketDataAdapter {
       await safeSet(cacheKey, JSON.stringify(tokens), "EX", 10);
       return tokens;
     } catch {
+      const stale = await safeGet(cacheKey);
+      if (stale) return (JSON.parse(stale) as TokenInfo[]).slice(0, limit);
       return [];
     }
   }
@@ -317,6 +319,8 @@ export class SolanaTrackerAdapter implements MarketDataAdapter {
       await safeSet(cacheKey, JSON.stringify(tokens), "EX", 10);
       return tokens;
     } catch {
+      const stale = await safeGet(cacheKey);
+      if (stale) return (JSON.parse(stale) as TokenInfo[]).slice(0, limit);
       return [];
     }
   }
@@ -415,6 +419,8 @@ export class SolanaTrackerAdapter implements MarketDataAdapter {
       }
       return tokens;
     } catch {
+      const stale = await safeGet(cacheKey);
+      if (stale) return (JSON.parse(stale) as TokenInfo[]).slice(0, limit);
       return [];
     }
   }
@@ -468,6 +474,8 @@ export class SolanaTrackerAdapter implements MarketDataAdapter {
       }
       return tokens;
     } catch {
+      const stale = await safeGet(cacheKey);
+      if (stale) return (JSON.parse(stale) as TokenInfo[]).slice(0, limit);
       return [];
     }
   }

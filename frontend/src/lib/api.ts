@@ -20,7 +20,7 @@ function getToken(): string | null {
 
 const responseCache = new Map<string, { data: unknown; ts: number }>();
 const CACHE_FRESH_MS = 500;     // serve instantly without background fetch
-const CACHE_STALE_MS = 15_000;  // serve instantly + background refresh
+const CACHE_STALE_MS = 30_000;  // serve stale data for up to 30s while refreshing
 const CACHE_MAX_SIZE = 300;
 const inflight = new Map<string, Promise<unknown>>();
 
@@ -28,15 +28,23 @@ function getCached<T>(key: string): { data: T; fresh: boolean } | null {
   const entry = responseCache.get(key);
   if (!entry) return null;
   const age = Date.now() - entry.ts;
+  // Never delete entries with non-empty token data — always return as stale
   if (age > CACHE_STALE_MS) {
+    if (!isEmptyTokenResponse(entry.data) && hasTokensKey(entry.data)) {
+      return { data: entry.data as T, fresh: false };
+    }
     responseCache.delete(key);
     return null;
   }
   return { data: entry.data as T, fresh: age <= CACHE_FRESH_MS };
 }
 
+function hasTokensKey(data: unknown): boolean {
+  return data !== null && typeof data === "object" && data !== undefined && "tokens" in data;
+}
+
 function isEmptyTokenResponse(data: unknown): boolean {
-  if (data && typeof data === "object" && "tokens" in data) {
+  if (hasTokensKey(data)) {
     const tokens = (data as { tokens?: unknown[] }).tokens;
     return Array.isArray(tokens) && tokens.length === 0;
   }
@@ -44,9 +52,11 @@ function isEmptyTokenResponse(data: unknown): boolean {
 }
 
 function setCache(key: string, data: unknown): void {
-  // Don't overwrite a non-empty token list with an empty one
   const existing = responseCache.get(key);
+  // Don't overwrite a non-empty token list with an empty one
   if (existing && isEmptyTokenResponse(data) && !isEmptyTokenResponse(existing.data)) {
+    // Refresh the timestamp so the good entry stays alive
+    existing.ts = Date.now();
     return;
   }
   if (responseCache.size >= CACHE_MAX_SIZE) {
@@ -64,6 +74,13 @@ function doFetch<T>(url: string, headers: Record<string, string>, options: Reque
       throw new Error(body.error || `Request failed: ${res.status}`);
     }
     const data = await res.json();
+    // If response is empty tokens but we have good cached data, keep the cached data
+    const existing = responseCache.get(cacheKey);
+    if (isEmptyTokenResponse(data) && existing && !isEmptyTokenResponse(existing.data)) {
+      existing.ts = Date.now();
+      inflight.delete(cacheKey);
+      return existing.data as T;
+    }
     setCache(cacheKey, data);
     inflight.delete(cacheKey);
     return data as T;

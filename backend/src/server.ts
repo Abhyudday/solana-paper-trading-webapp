@@ -70,11 +70,20 @@ async function main() {
 
     // Warm up caches so landing page loads instantly
     const adapter = new SolanaTrackerAdapter();
-    Promise.all([
-      adapter.getLatestTokens(20),
-      adapter.getGraduatingTokens(20),
-      adapter.getGraduatedTokens(20),
-    ]).then(() => console.log("Cache warmup complete")).catch(() => {});
+    const warmup = async () => {
+      try {
+        await Promise.all([
+          adapter.getLatestTokens(20),
+          adapter.getGraduatingTokens(20),
+          adapter.getGraduatedTokens(20),
+        ]);
+      } catch {}
+    };
+    await warmup();
+    console.log("Cache warmup complete");
+
+    // Continuous background refresh every 3s so cache is always warm
+    setInterval(warmup, 3_000);
   } catch (err) {
     app.log.error(err);
     process.exit(1);
