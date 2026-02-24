@@ -15,7 +15,13 @@ export async function startPricePoller() {
     return;
   }
 
-  const connection = { host: redis.options.host || "localhost", port: redis.options.port || 6379 };
+  // BullMQ needs full connection config including password
+  const connection = {
+    host: redis.options.host || "localhost",
+    port: redis.options.port || 6379,
+    password: redis.options.password,
+    username: redis.options.username,
+  };
 
   priceQueue = new Queue("price-polling", { connection });
 
