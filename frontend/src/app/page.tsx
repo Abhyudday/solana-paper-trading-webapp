@@ -74,25 +74,20 @@ function TokenCard({ token, isNew }: { token: DisplayToken; isNew?: boolean }) {
     >
       <div className="flex items-start gap-2.5">
         {/* Token Avatar */}
-        <div className="flex-shrink-0 relative h-10 w-10">
+        <div className="flex-shrink-0">
           {token.image ? (
-            <>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={token.image}
-                alt={token.symbol}
-                className="h-10 w-10 rounded-full object-cover bg-bg-tertiary ring-1 ring-border"
-                onError={(e) => {
-                  (e.target as HTMLImageElement).style.display = "none";
-                  const fallback = (e.target as HTMLImageElement).nextElementSibling as HTMLElement | null;
-                  if (fallback) fallback.style.display = "flex";
-                }}
-              />
-              <div className="h-10 w-10 rounded-full bg-bg-tertiary items-center justify-center text-xs font-bold text-text-muted ring-1 ring-border absolute inset-0" style={{ display: "none" }}>
-                {token.symbol?.charAt(0) || "?"}
-              </div>
-            </>
-          ) : (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={token.image}
+              alt={token.symbol}
+              className="h-10 w-10 rounded-full object-cover bg-bg-tertiary ring-1 ring-border"
+              onError={(e) => {
+                (e.target as HTMLImageElement).style.display = "none";
+                (e.target as HTMLImageElement).nextElementSibling?.classList.remove("hidden");
+              }}
+            />
+          ) : null}
+          {!token.image && (
             <div className="h-10 w-10 rounded-full bg-bg-tertiary flex items-center justify-center text-xs font-bold text-text-muted ring-1 ring-border">
               {token.symbol?.charAt(0) || "?"}
             </div>
@@ -179,7 +174,7 @@ function TokenColumn({
   const filterCount = countActiveFilters(filters);
   const lastTokensRef = useRef<DisplayToken[]>([]);
   const seenMintsRef = useRef<Set<string>>(new Set());
-  const isFirstRenderRef = useRef(true);
+  const hasSeenFirstBatchRef = useRef(false);
   const hasEverLoadedRef = useRef(false);
 
   const tokens = useMemo(() => {
@@ -196,8 +191,9 @@ function TokenColumn({
   const displayTokens = tokens.length > 0 ? tokens : lastTokensRef.current;
 
   // Detect which tokens are new (not in the previously seen set)
+  // Only detect new tokens AFTER we've already shown the first batch
   const newMints = useMemo(() => {
-    if (isFirstRenderRef.current) return new Set<string>();
+    if (!hasSeenFirstBatchRef.current) return new Set<string>();
     const fresh = new Set<string>();
     for (const t of displayTokens) {
       if (!seenMintsRef.current.has(t.mint)) fresh.add(t.mint);
@@ -207,7 +203,9 @@ function TokenColumn({
 
   // After render, update seen mints
   useEffect(() => {
-    isFirstRenderRef.current = false;
+    if (displayTokens.length > 0) {
+      hasSeenFirstBatchRef.current = true;
+    }
     seenMintsRef.current = new Set(displayTokens.map((t) => t.mint));
   }, [displayTokens]);
 
