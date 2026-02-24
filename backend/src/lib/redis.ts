@@ -33,6 +33,8 @@ function createRedisClient(label: string): Redis {
       return true;
     },
     lazyConnect: true,
+    enableReadyCheck: false, // Disable INFO command that requires auth
+    showFriendlyErrorStack: true,
   });
 
   client.on("error", (err) => {
