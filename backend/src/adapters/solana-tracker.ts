@@ -1,5 +1,6 @@
 import { config } from "../config";
 import { safeGet, safeSet, CACHE_KEYS } from "../lib/redis";
+import { memCache } from "../lib/mem-cache";
 import type {
   MarketDataAdapter,
   TokenSearchResult,
@@ -22,7 +23,7 @@ async function fetchApi<T>(path: string, params?: Record<string, string>): Promi
     Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v));
   }
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 5000);
+  const timeout = setTimeout(() => controller.abort(), 3000);
   const res = await fetch(url.toString(), {
     headers: {
       "x-api-key": config.SOLANA_TRACKER_API_KEY,
@@ -72,8 +73,15 @@ export class SolanaTrackerAdapter implements MarketDataAdapter {
   }
 
   async getTokenInfo(mint: string): Promise<TokenInfo | null> {
+    const memHit = memCache.get<TokenInfo>(`ti:${mint}`);
+    if (memHit) return memHit;
+
     const cached = await safeGet(CACHE_KEYS.tokenInfo(mint));
-    if (cached) return JSON.parse(cached);
+    if (cached) {
+      const parsed = JSON.parse(cached);
+      memCache.set(`ti:${mint}`, parsed, 15);
+      return parsed;
+    }
 
     try {
       const data = await fetchApi<{
@@ -101,6 +109,7 @@ export class SolanaTrackerAdapter implements MarketDataAdapter {
         volume24h: pool?.volume?.h24 || 0,
       };
 
+      memCache.set(`ti:${mint}`, info, 15);
       await safeSet(CACHE_KEYS.tokenInfo(mint), JSON.stringify(info), "EX", CACHE_TTL_INFO);
       await safeSet(CACHE_KEYS.tokenPrice(mint), String(info.price), "EX", CACHE_TTL_PRICE);
 
@@ -112,8 +121,15 @@ export class SolanaTrackerAdapter implements MarketDataAdapter {
 
   async getOHLCV(mint: string, range: ChartRange): Promise<OHLCVBar[]> {
     const cacheKey = `chart:${mint}:${range}`;
+    const memHit = memCache.get<OHLCVBar[]>(cacheKey);
+    if (memHit) return memHit;
+
     const cached = await safeGet(cacheKey);
-    if (cached) return JSON.parse(cached) as OHLCVBar[];
+    if (cached) {
+      const parsed = JSON.parse(cached) as OHLCVBar[];
+      memCache.set(cacheKey, parsed, 15);
+      return parsed;
+    }
 
     const now = Math.floor(Date.now() / 1000);
     const from = now - rangeToSeconds(range);
@@ -145,6 +161,7 @@ export class SolanaTrackerAdapter implements MarketDataAdapter {
         volume: b.volume || 0,
       }));
 
+      memCache.set(cacheKey, bars, 15);
       await safeSet(cacheKey, JSON.stringify(bars), "EX", CACHE_TTL_CHART);
       return bars;
     } catch {
@@ -153,9 +170,13 @@ export class SolanaTrackerAdapter implements MarketDataAdapter {
   }
 
   async getTopTokens(limit: number): Promise<TokenInfo[]> {
+    const memHit = memCache.get<TokenInfo[]>("market:top");
+    if (memHit) return memHit.slice(0, limit);
+
     const cached = await safeGet(CACHE_KEYS.topTokens());
     if (cached) {
       const parsed = JSON.parse(cached) as TokenInfo[];
+      memCache.set("market:top", parsed, 2);
       return parsed.slice(0, limit);
     }
 
@@ -190,6 +211,7 @@ export class SolanaTrackerAdapter implements MarketDataAdapter {
           };
         });
 
+      memCache.set("market:top", tokens, 2);
       await safeSet(CACHE_KEYS.topTokens(), JSON.stringify(tokens), "EX", CACHE_TTL_TOP);
       return tokens;
     } catch {
@@ -199,9 +221,14 @@ export class SolanaTrackerAdapter implements MarketDataAdapter {
 
   async getLatestTokens(limit: number): Promise<TokenInfo[]> {
     const cacheKey = "market:latest";
+    const memHit = memCache.get<TokenInfo[]>(cacheKey);
+    if (memHit) return memHit.slice(0, limit);
+
     const cached = await safeGet(cacheKey);
     if (cached) {
-      return (JSON.parse(cached) as TokenInfo[]).slice(0, limit);
+      const parsed = JSON.parse(cached) as TokenInfo[];
+      memCache.set(cacheKey, parsed, 2);
+      return parsed.slice(0, limit);
     }
 
     try {
@@ -235,7 +262,8 @@ export class SolanaTrackerAdapter implements MarketDataAdapter {
           };
         });
 
-      await safeSet(cacheKey, JSON.stringify(tokens), "EX", 30);
+      memCache.set(cacheKey, tokens, 2);
+      await safeSet(cacheKey, JSON.stringify(tokens), "EX", 10);
       return tokens;
     } catch {
       return [];
@@ -244,9 +272,14 @@ export class SolanaTrackerAdapter implements MarketDataAdapter {
 
   async getTrendingTokens(limit: number): Promise<TokenInfo[]> {
     const cacheKey = "market:trending";
+    const memHit = memCache.get<TokenInfo[]>(cacheKey);
+    if (memHit) return memHit.slice(0, limit);
+
     const cached = await safeGet(cacheKey);
     if (cached) {
-      return (JSON.parse(cached) as TokenInfo[]).slice(0, limit);
+      const parsed = JSON.parse(cached) as TokenInfo[];
+      memCache.set(cacheKey, parsed, 2);
+      return parsed.slice(0, limit);
     }
 
     try {
@@ -280,7 +313,8 @@ export class SolanaTrackerAdapter implements MarketDataAdapter {
           };
         });
 
-      await safeSet(cacheKey, JSON.stringify(tokens), "EX", 30);
+      memCache.set(cacheKey, tokens, 2);
+      await safeSet(cacheKey, JSON.stringify(tokens), "EX", 10);
       return tokens;
     } catch {
       return [];
@@ -289,8 +323,15 @@ export class SolanaTrackerAdapter implements MarketDataAdapter {
 
   async getTokenTrades(mint: string): Promise<TokenTrade[]> {
     const cacheKey = `trades:${mint}`;
+    const memHit = memCache.get<TokenTrade[]>(cacheKey);
+    if (memHit) return memHit;
+
     const cached = await safeGet(cacheKey);
-    if (cached) return JSON.parse(cached) as TokenTrade[];
+    if (cached) {
+      const parsed = JSON.parse(cached) as TokenTrade[];
+      memCache.set(cacheKey, parsed, 10);
+      return parsed;
+    }
 
     try {
       const data = await fetchApi<{
@@ -317,7 +358,8 @@ export class SolanaTrackerAdapter implements MarketDataAdapter {
         time: t.time || 0,
       }));
 
-      await safeSet(cacheKey, JSON.stringify(trades), "EX", 5);
+      memCache.set(cacheKey, trades, 10);
+      await safeSet(cacheKey, JSON.stringify(trades), "EX", 15);
       return trades;
     } catch {
       return [];
@@ -326,8 +368,15 @@ export class SolanaTrackerAdapter implements MarketDataAdapter {
 
   async getGraduatingTokens(limit: number): Promise<TokenInfo[]> {
     const cacheKey = "market:graduating";
+    const memHit = memCache.get<TokenInfo[]>(cacheKey);
+    if (memHit) return memHit.slice(0, limit);
+
     const cached = await safeGet(cacheKey);
-    if (cached) return (JSON.parse(cached) as TokenInfo[]).slice(0, limit);
+    if (cached) {
+      const parsed = JSON.parse(cached) as TokenInfo[];
+      memCache.set(cacheKey, parsed, 2);
+      return parsed.slice(0, limit);
+    }
 
     try {
       const data = await fetchApi<Array<{
@@ -360,7 +409,10 @@ export class SolanaTrackerAdapter implements MarketDataAdapter {
           };
         });
 
-      await safeSet(cacheKey, JSON.stringify(tokens), "EX", 15);
+      if (tokens.length > 0) {
+        memCache.set(cacheKey, tokens, 2);
+        await safeSet(cacheKey, JSON.stringify(tokens), "EX", 10);
+      }
       return tokens;
     } catch {
       return [];
@@ -369,8 +421,15 @@ export class SolanaTrackerAdapter implements MarketDataAdapter {
 
   async getGraduatedTokens(limit: number): Promise<TokenInfo[]> {
     const cacheKey = "market:graduated";
+    const memHit = memCache.get<TokenInfo[]>(cacheKey);
+    if (memHit) return memHit.slice(0, limit);
+
     const cached = await safeGet(cacheKey);
-    if (cached) return (JSON.parse(cached) as TokenInfo[]).slice(0, limit);
+    if (cached) {
+      const parsed = JSON.parse(cached) as TokenInfo[];
+      memCache.set(cacheKey, parsed, 2);
+      return parsed.slice(0, limit);
+    }
 
     try {
       const data = await fetchApi<Array<{
@@ -403,7 +462,10 @@ export class SolanaTrackerAdapter implements MarketDataAdapter {
           };
         });
 
-      await safeSet(cacheKey, JSON.stringify(tokens), "EX", 15);
+      if (tokens.length > 0) {
+        memCache.set(cacheKey, tokens, 2);
+        await safeSet(cacheKey, JSON.stringify(tokens), "EX", 10);
+      }
       return tokens;
     } catch {
       return [];

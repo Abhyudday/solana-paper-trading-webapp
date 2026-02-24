@@ -18,6 +18,62 @@ function getToken(): string | null {
   return localStorage.getItem("auth_token");
 }
 
+const responseCache = new Map<string, { data: unknown; ts: number }>();
+const CACHE_FRESH_MS = 500;     // serve instantly without background fetch
+const CACHE_STALE_MS = 15_000;  // serve instantly + background refresh
+const CACHE_MAX_SIZE = 300;
+const inflight = new Map<string, Promise<unknown>>();
+
+function getCached<T>(key: string): { data: T; fresh: boolean } | null {
+  const entry = responseCache.get(key);
+  if (!entry) return null;
+  const age = Date.now() - entry.ts;
+  if (age > CACHE_STALE_MS) {
+    responseCache.delete(key);
+    return null;
+  }
+  return { data: entry.data as T, fresh: age <= CACHE_FRESH_MS };
+}
+
+function isEmptyTokenResponse(data: unknown): boolean {
+  if (data && typeof data === "object" && "tokens" in data) {
+    const tokens = (data as { tokens?: unknown[] }).tokens;
+    return Array.isArray(tokens) && tokens.length === 0;
+  }
+  return false;
+}
+
+function setCache(key: string, data: unknown): void {
+  // Don't overwrite a non-empty token list with an empty one
+  const existing = responseCache.get(key);
+  if (existing && isEmptyTokenResponse(data) && !isEmptyTokenResponse(existing.data)) {
+    return;
+  }
+  if (responseCache.size >= CACHE_MAX_SIZE) {
+    const oldest = responseCache.keys().next().value;
+    if (oldest) responseCache.delete(oldest);
+  }
+  responseCache.set(key, { data, ts: Date.now() });
+}
+
+function doFetch<T>(url: string, headers: Record<string, string>, options: RequestInit, cacheKey: string): Promise<T> {
+  const promise = (async () => {
+    const res = await fetch(url, { ...options, headers });
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      throw new Error(body.error || `Request failed: ${res.status}`);
+    }
+    const data = await res.json();
+    setCache(cacheKey, data);
+    inflight.delete(cacheKey);
+    return data as T;
+  })();
+
+  inflight.set(cacheKey, promise);
+  promise.catch(() => { inflight.delete(cacheKey); });
+  return promise;
+}
+
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const token = getToken();
   const headers: Record<string, string> = {
@@ -26,12 +82,35 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   };
   if (token) headers["Authorization"] = `Bearer ${token}`;
 
-  const res = await fetch(`${BASE_URL}${path}`, { ...options, headers });
-  if (!res.ok) {
-    const body = await res.json().catch(() => ({}));
-    throw new Error(body.error || `Request failed: ${res.status}`);
+  const method = options.method?.toUpperCase() || "GET";
+  const isGet = method === "GET";
+  const cacheKey = path;
+
+  if (isGet) {
+    const cached = getCached<T>(cacheKey);
+    if (cached) {
+      // Fresh: return immediately, no background fetch
+      if (cached.fresh) return cached.data;
+      // Stale: return immediately + kick off background refresh
+      doFetch<T>(`${BASE_URL}${path}`, headers, options, cacheKey);
+      return cached.data;
+    }
+
+    // Dedupe identical inflight requests
+    const pending = inflight.get(cacheKey);
+    if (pending) return pending as Promise<T>;
   }
-  return res.json();
+
+  if (!isGet) {
+    const res = await fetch(`${BASE_URL}${path}`, { ...options, headers });
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      throw new Error(body.error || `Request failed: ${res.status}`);
+    }
+    return res.json();
+  }
+
+  return doFetch<T>(`${BASE_URL}${path}`, headers, options, cacheKey);
 }
 
 export const api = {

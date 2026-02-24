@@ -1,9 +1,9 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import dynamic from "next/dynamic";
 import { useParams } from "next/navigation";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient, keepPreviousData } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { wsClient } from "@/lib/ws";
@@ -26,56 +26,53 @@ export default function TokenPage() {
   const { isAuthenticated } = useAuth();
   const [range, setRange] = useState<ChartRange>("1d");
 
-  const { data: tokenInfo, isLoading: tokenLoading } = useQuery({
+  const queryClient = useQueryClient();
+
+  const { data: tokenInfo, isLoading: tokenLoading, isFetched: tokenFetched } = useQuery({
     queryKey: ["token", mint],
     queryFn: () => api.market.getToken(mint),
     enabled: !!mint,
-    refetchInterval: 5000,
-    staleTime: 30000,
-    retry: 3,
-    retryDelay: 1000,
+    refetchInterval: 4_000,
+    staleTime: 3_000,
+    placeholderData: keepPreviousData,
   });
 
-  // Start chart fetch immediately (don't wait for tokenInfo)
   const { data: chartData, isLoading: chartLoading } = useQuery({
     queryKey: ["chart", mint, range],
     queryFn: () => api.market.getChart(mint, range),
     enabled: !!mint,
-    refetchInterval: 10000,
-    staleTime: 30000,
+    refetchInterval: 10_000,
+    staleTime: 8_000,
+    placeholderData: keepPreviousData,
   });
 
   const { data: portfolio } = useQuery({
     queryKey: ["portfolio"],
     queryFn: () => api.portfolio.get(),
     enabled: isAuthenticated,
-    refetchInterval: 10000,
+    refetchInterval: 15_000,
+    staleTime: 10_000,
   });
 
+  // Prefetch trades so they load in parallel with token info
   useEffect(() => {
     if (mint) {
+      queryClient.prefetchQuery({
+        queryKey: ["tokenTrades", mint],
+        queryFn: () => api.market.getTokenTrades(mint),
+        staleTime: 3_000,
+      });
       wsClient.subscribe(mint);
       return () => wsClient.unsubscribe(mint);
     }
-  }, [mint]);
+  }, [mint, queryClient]);
 
   const usdcBalance = portfolio?.usdcBalance ?? 0;
   const position = portfolio?.positions.find((p) => p.mint === mint);
   const tokenQty = position?.qty ?? 0;
 
-  // Show spinner only on first load with no cached data
-  if (!tokenInfo) {
-    if (tokenLoading) {
-      return (
-        <div className="flex items-center justify-center h-96">
-          <div className="flex flex-col items-center gap-3">
-            <div className="h-6 w-6 border-2 border-accent-green border-t-transparent rounded-full animate-spin" />
-            <div className="text-text-muted text-xs">Loading...</div>
-          </div>
-        </div>
-      );
-    }
-    // Query finished but no data → truly not found
+  // Token not found — only after fetch completes with no data
+  if (!tokenInfo && tokenFetched && !tokenLoading) {
     return (
       <div className="flex items-center justify-center h-96">
         <div className="text-text-muted text-sm">Token not found</div>
@@ -83,29 +80,70 @@ export default function TokenPage() {
     );
   }
 
+  // Show skeleton while loading (instead of blank page)
+  const isLoading = !tokenInfo && tokenLoading;
+
+  if (isLoading) {
+    return (
+      <div className="pt-2 pb-6">
+        {/* Skeleton Header */}
+        <div className="flex items-center gap-3 mb-2 pb-2 border-b border-border">
+          <div className="flex items-center gap-2">
+            <div className="h-8 w-8 rounded-full bg-bg-tertiary animate-pulse ring-1 ring-border" />
+            <div>
+              <div className="h-4 w-24 bg-bg-tertiary rounded animate-pulse mb-1" />
+              <div className="h-3 w-32 bg-bg-tertiary rounded animate-pulse" />
+            </div>
+          </div>
+          <div className="flex items-center gap-4 ml-auto">
+            {Array.from({ length: 5 }).map((_, i) => (
+              <div key={i} className="flex flex-col items-center gap-1">
+                <div className="h-2.5 w-8 bg-bg-tertiary rounded animate-pulse" />
+                <div className="h-3 w-12 bg-bg-tertiary rounded animate-pulse" />
+              </div>
+            ))}
+          </div>
+        </div>
+        {/* Skeleton Body */}
+        <div className="grid grid-cols-1 lg:grid-cols-[1fr_300px] gap-2">
+          <div className="flex flex-col gap-2">
+            <div className="rounded border border-border bg-bg-primary h-[420px] animate-pulse" />
+            <div className="rounded border border-border bg-bg-card h-[300px] animate-pulse" />
+          </div>
+          <div className="flex flex-col gap-2">
+            <div className="rounded border border-border bg-bg-card h-[280px] animate-pulse" />
+            <div className="rounded border border-border bg-bg-card h-[140px] animate-pulse" />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  const t = tokenInfo!;
+
   return (
     <div className="pt-2 pb-6">
       {/* Token Header Bar */}
       <div className="flex items-center gap-3 mb-2 pb-2 border-b border-border">
         {/* Token identity */}
         <div className="flex items-center gap-2">
-          {tokenInfo.image ? (
+          {t.image ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
-              src={tokenInfo.image}
-              alt={tokenInfo.symbol}
+              src={t.image}
+              alt={t.symbol}
               className="h-8 w-8 rounded-full object-cover ring-1 ring-border"
               onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
             />
           ) : (
             <div className="h-8 w-8 rounded-full bg-bg-tertiary flex items-center justify-center text-xs font-bold text-text-muted ring-1 ring-border">
-              {tokenInfo.symbol?.charAt(0)}
+              {t.symbol?.charAt(0)}
             </div>
           )}
           <div>
             <div className="flex items-center gap-1.5">
-              <span className="font-bold text-sm">{tokenInfo.symbol}</span>
-              <span className="text-[10px] text-text-muted">{tokenInfo.name}</span>
+              <span className="font-bold text-sm">{t.symbol}</span>
+              <span className="text-[10px] text-text-muted">{t.name}</span>
             </div>
             <span className="text-[9px] font-mono text-text-muted">{shortenAddress(mint, 6)}</span>
           </div>
@@ -113,11 +151,11 @@ export default function TokenPage() {
 
         {/* Stats bar */}
         <div className="flex items-center gap-4 ml-auto">
-          <StatItem label="Price" value={formatPrice(tokenInfo.price)} highlight />
-          <StatItem label="Liq" value={formatCompact(tokenInfo.liquidity)} />
-          <StatItem label="24h Vol" value={formatCompact(tokenInfo.volume24h || 0)} />
-          <StatItem label="MCap" value={formatCompact(tokenInfo.marketCap)} />
-          <StatItem label="Supply" value={formatNumber(tokenInfo.supply, 0)} />
+          <StatItem label="Price" value={formatPrice(t.price)} highlight />
+          <StatItem label="Liq" value={formatCompact(t.liquidity)} />
+          <StatItem label="24h Vol" value={formatCompact(t.volume24h || 0)} />
+          <StatItem label="MCap" value={formatCompact(t.marketCap)} />
+          <StatItem label="Supply" value={formatNumber(t.supply, 0)} />
         </div>
       </div>
 
@@ -163,7 +201,7 @@ export default function TokenPage() {
 
         {/* Right: Order Panel + Token Details */}
         <div className="flex flex-col gap-2">
-          <OrderPanel token={tokenInfo} usdcBalance={usdcBalance} tokenQty={tokenQty} />
+          <OrderPanel token={t} usdcBalance={usdcBalance} tokenQty={tokenQty} />
 
           {/* Token Details card */}
           <div className="rounded border border-border bg-bg-card p-3">
@@ -171,19 +209,19 @@ export default function TokenPage() {
             <div className="grid grid-cols-2 gap-2 text-[10px]">
               <div>
                 <span className="text-text-muted">Mint</span>
-                <div className="font-mono text-text-secondary truncate" title={tokenInfo.mint}>{shortenAddress(tokenInfo.mint, 6)}</div>
+                <div className="font-mono text-text-secondary truncate" title={t.mint}>{shortenAddress(t.mint, 6)}</div>
               </div>
               <div>
                 <span className="text-text-muted">Decimals</span>
-                <div className="text-text-secondary">{tokenInfo.decimals}</div>
+                <div className="text-text-secondary">{t.decimals}</div>
               </div>
               <div>
                 <span className="text-text-muted">Supply</span>
-                <div className="text-text-secondary">{formatNumber(tokenInfo.supply, 0)}</div>
+                <div className="text-text-secondary">{formatNumber(t.supply, 0)}</div>
               </div>
               <div>
                 <span className="text-text-muted">Liquidity</span>
-                <div className="text-text-secondary">{formatCompact(tokenInfo.liquidity)}</div>
+                <div className="text-text-secondary">{formatCompact(t.liquidity)}</div>
               </div>
             </div>
           </div>

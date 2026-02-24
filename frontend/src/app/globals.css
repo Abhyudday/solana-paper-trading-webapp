@@ -47,6 +47,35 @@ body {
   border-radius: 3px;
 }
 
+@keyframes tokenSlideIn {
+  0% {
+    opacity: 0;
+    transform: translateY(-8px) scale(0.98);
+    max-height: 0;
+  }
+  40% {
+    max-height: 120px;
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    max-height: 120px;
+  }
+}
+
+@keyframes tokenHighlight {
+  0% {
+    box-shadow: 0 0 0 1px var(--accent-green), 0 0 8px rgba(0, 200, 83, 0.15);
+  }
+  100% {
+    box-shadow: none;
+  }
+}
+
+.token-card-enter {
+  animation: tokenSlideIn 0.4s ease-out both, tokenHighlight 1.5s ease-out 0.3s both;
+}
+
 @layer utilities {
   .text-green { color: var(--accent-green); }
   .text-red { color: var(--accent-red); }

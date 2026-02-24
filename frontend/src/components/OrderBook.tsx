@@ -1,6 +1,7 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
+import { useRef } from "react";
+import { useQuery, keepPreviousData } from "@tanstack/react-query";
 import { api, TokenTrade } from "@/lib/api";
 import { formatCompact, shortenAddress, timeAgo } from "@/lib/format";
 
@@ -37,19 +38,32 @@ function TxRow({ trade }: { trade: TokenTrade }) {
 }
 
 export function Transactions({ mint }: TransactionsProps) {
-  const { data, isLoading } = useQuery({
+  const lastTradesRef = useRef<TokenTrade[]>([]);
+
+  const { data, isFetching } = useQuery({
     queryKey: ["tokenTrades", mint],
     queryFn: () => api.market.getTokenTrades(mint),
-    refetchInterval: 5000,
+    refetchInterval: 5_000,
+    staleTime: 3_000,
+    placeholderData: keepPreviousData,
   });
 
-  const trades = data?.trades || [];
+  const freshTrades = data?.trades || [];
+  // Keep showing old trades if a refetch returned empty — avoids flicker
+  if (freshTrades.length > 0) {
+    lastTradesRef.current = freshTrades;
+  }
+  const trades = freshTrades.length > 0 ? freshTrades : lastTradesRef.current;
+
+  const isFirstLoad = !data && isFetching;
 
   return (
     <div className="rounded border border-border bg-bg-card overflow-hidden">
       <div className="flex items-center justify-between px-3 py-1.5 border-b border-border bg-bg-secondary">
         <h3 className="text-[10px] font-semibold text-text-muted uppercase tracking-wider">Trades</h3>
-        <span className="text-[9px] text-accent-green font-medium animate-pulse">live</span>
+        <span className={`text-[9px] font-medium ${isFetching ? "text-yellow-400 animate-pulse" : "text-accent-green animate-pulse"}`}>
+          {isFetching ? "updating" : "live"}
+        </span>
       </div>
 
       {/* Column headers */}
@@ -63,7 +77,7 @@ export function Transactions({ mint }: TransactionsProps) {
 
       {/* Trades list */}
       <div className="max-h-[300px] overflow-y-auto scrollbar-thin">
-        {isLoading ? (
+        {isFirstLoad ? (
           Array.from({ length: 8 }).map((_, i) => (
             <div key={i} className="h-7 animate-pulse bg-bg-tertiary/10 border-b border-border/20" />
           ))

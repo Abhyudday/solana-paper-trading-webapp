@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useMemo, useCallback } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useState, useMemo, useCallback, useRef, useEffect } from "react";
+import { useQuery, useQueryClient, keepPreviousData } from "@tanstack/react-query";
 import { api, TokenInfo, TokenFilterParams, FilteredTokenItem } from "@/lib/api";
 import { formatCompact, formatPrice, shortenAddress } from "@/lib/format";
 import { FilterPanel } from "@/components/FilterPanel";
@@ -50,7 +50,7 @@ function sortTokens(tokens: DisplayToken[], key: SortKey): DisplayToken[] {
   }
 }
 
-function TokenCard({ token }: { token: DisplayToken }) {
+function TokenCard({ token, isNew }: { token: DisplayToken; isNew?: boolean }) {
   const queryClient = useQueryClient();
 
   const handlePrefetch = useCallback(() => {
@@ -69,7 +69,7 @@ function TokenCard({ token }: { token: DisplayToken }) {
   return (
     <Link
       href={`/token/${token.mint}`}
-      className="block rounded border border-border bg-bg-card p-2.5 hover:border-accent-green/40 transition-all group"
+      className={`block rounded border border-border bg-bg-card p-2.5 hover:border-accent-green/40 transition-all group overflow-hidden ${isNew ? "token-card-enter" : ""}`}
       onMouseEnter={handlePrefetch}
     >
       <div className="flex items-start gap-2.5">
@@ -170,13 +170,39 @@ function TokenColumn({
   const [sort, setSort] = useState<SortKey>("default");
   const hasFilters = countActiveFilters(filters) > 0;
   const filterCount = countActiveFilters(filters);
+  const lastTokensRef = useRef<DisplayToken[]>([]);
+  const seenMintsRef = useRef<Set<string>>(new Set());
+  const isFirstRenderRef = useRef(true);
 
   const tokens = useMemo(() => {
     const raw = hasFilters && filteredTokens ? toDisplayTokens(filteredTokens) : toDisplayTokens(defaultTokens);
     return sortTokens(raw, sort);
   }, [defaultTokens, filteredTokens, hasFilters, sort]);
 
-  const loading = hasFilters ? isFilterLoading : isLoading;
+  // Remember last non-empty list so columns never blank out during refetches
+  if (tokens.length > 0) {
+    lastTokensRef.current = tokens;
+  }
+  const displayTokens = tokens.length > 0 ? tokens : lastTokensRef.current;
+
+  // Detect which tokens are new (not in the previously seen set)
+  const newMints = useMemo(() => {
+    if (isFirstRenderRef.current) return new Set<string>();
+    const fresh = new Set<string>();
+    for (const t of displayTokens) {
+      if (!seenMintsRef.current.has(t.mint)) fresh.add(t.mint);
+    }
+    return fresh;
+  }, [displayTokens]);
+
+  // After render, update seen mints
+  useEffect(() => {
+    isFirstRenderRef.current = false;
+    seenMintsRef.current = new Set(displayTokens.map((t) => t.mint));
+  }, [displayTokens]);
+
+  // Only show skeleton on very first load when we have never received data
+  const loading = (hasFilters ? isFilterLoading : isLoading) && lastTokensRef.current.length === 0;
 
   return (
     <div className="flex flex-col min-w-0">
@@ -185,7 +211,7 @@ function TokenColumn({
         <div className="flex items-center gap-1.5">
           <span className={`h-1.5 w-1.5 rounded-full ${color}`} />
           <h2 className="text-[11px] font-semibold text-text-primary">{title}</h2>
-          <span className="text-[10px] text-text-muted">({tokens.length})</span>
+          <span className="text-[10px] text-text-muted">({displayTokens.length})</span>
         </div>
         <div className="flex items-center gap-1">
           {/* Sort pills */}
@@ -224,7 +250,7 @@ function TokenColumn({
           Array.from({ length: 8 }).map((_, i) => (
             <div key={i} className="rounded border border-border bg-bg-card p-2.5 animate-pulse h-[80px]" />
           ))
-        ) : tokens.length === 0 ? (
+        ) : displayTokens.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-12 text-text-muted">
             <svg className="w-10 h-10 mb-2 opacity-30" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
@@ -232,7 +258,7 @@ function TokenColumn({
             <span className="text-xs">No Data</span>
           </div>
         ) : (
-          tokens.map((token) => <TokenCard key={token.mint} token={token} />)
+          displayTokens.map((token) => <TokenCard key={token.mint} token={token} isNew={newMints.has(token.mint)} />)
         )}
       </div>
     </div>
@@ -253,22 +279,25 @@ export default function LandingPage() {
   const { data: latestData, isLoading: latestLoading } = useQuery({
     queryKey: ["latestTokens"],
     queryFn: () => api.market.getLatestTokens(),
-    refetchInterval: 5000,
-    staleTime: 3000,
+    refetchInterval: 1_500,
+    staleTime: 1_000,
+    placeholderData: keepPreviousData,
   });
 
   const { data: graduatingData, isLoading: graduatingLoading } = useQuery({
     queryKey: ["graduatingTokens"],
     queryFn: () => api.market.getGraduatingTokens(),
-    refetchInterval: 5000,
-    staleTime: 3000,
+    refetchInterval: 1_500,
+    staleTime: 1_000,
+    placeholderData: keepPreviousData,
   });
 
   const { data: graduatedData, isLoading: graduatedLoading } = useQuery({
     queryKey: ["graduatedTokens"],
     queryFn: () => api.market.getGraduatedTokens(),
-    refetchInterval: 5000,
-    staleTime: 3000,
+    refetchInterval: 1_500,
+    staleTime: 1_000,
+    placeholderData: keepPreviousData,
   });
 
   // Filtered queries — only enabled when filters are active
@@ -280,24 +309,27 @@ export default function LandingPage() {
     queryKey: ["filteredNew", columnFilters.new],
     queryFn: () => api.market.getFilteredTokens({ ...columnFilters.new, sortBy: "createdAt", sortOrder: "desc" }),
     enabled: newHasFilters,
-    refetchInterval: 5000,
-    staleTime: 3000,
+    refetchInterval: 1_500,
+    staleTime: 1_000,
+    placeholderData: keepPreviousData,
   });
 
   const { data: filteredMigrating, isLoading: filteredMigratingLoading } = useQuery({
     queryKey: ["filteredMigrating", columnFilters.migrating],
     queryFn: () => api.market.getFilteredTokens({ ...columnFilters.migrating, status: "graduating" }),
     enabled: migratingHasFilters,
-    refetchInterval: 5000,
-    staleTime: 3000,
+    refetchInterval: 1_500,
+    staleTime: 1_000,
+    placeholderData: keepPreviousData,
   });
 
   const { data: filteredMigrated, isLoading: filteredMigratedLoading } = useQuery({
     queryKey: ["filteredMigrated", columnFilters.migrated],
     queryFn: () => api.market.getFilteredTokens({ ...columnFilters.migrated, status: "graduated" }),
     enabled: migratedHasFilters,
-    refetchInterval: 5000,
-    staleTime: 3000,
+    refetchInterval: 1_500,
+    staleTime: 1_000,
+    placeholderData: keepPreviousData,
   });
 
   const handleApplyFilter = useCallback((col: ColumnId, filters: TokenFilterParams) => {

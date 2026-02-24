@@ -22,6 +22,7 @@ export async function marketRoutes(app: FastifyInstance) {
     if (!info) {
       return reply.status(404).send({ error: "Token not found" });
     }
+    reply.header("Cache-Control", "public, max-age=5, stale-while-revalidate=10");
     return reply.send(info);
   });
 
@@ -32,6 +33,7 @@ export async function marketRoutes(app: FastifyInstance) {
       return reply.status(400).send({ error: parsed.error.flatten() });
     }
     const bars = await adapter.getOHLCV(mint, parsed.data.range);
+    reply.header("Cache-Control", "public, max-age=10, stale-while-revalidate=20");
     return reply.send({ bars });
   });
 
@@ -54,32 +56,38 @@ export async function marketRoutes(app: FastifyInstance) {
 
   app.get("/api/market/top", async (_request, reply) => {
     const tokens = await adapter.getTopTokens(20);
+    reply.header("Cache-Control", "public, max-age=5, stale-while-revalidate=15");
     return reply.send({ tokens });
   });
 
   app.get("/api/market/latest", async (_request, reply) => {
     const tokens = await adapter.getLatestTokens(20);
+    reply.header("Cache-Control", "public, max-age=5, stale-while-revalidate=15");
     return reply.send({ tokens });
   });
 
   app.get("/api/market/trending", async (_request, reply) => {
     const tokens = await adapter.getTrendingTokens(20);
+    reply.header("Cache-Control", "public, max-age=5, stale-while-revalidate=15");
     return reply.send({ tokens });
   });
 
   app.get("/api/market/tokens/:mint/trades", async (request, reply) => {
     const { mint } = request.params as { mint: string };
     const trades = await adapter.getTokenTrades(mint);
+    reply.header("Cache-Control", "public, max-age=3, stale-while-revalidate=7");
     return reply.send({ trades });
   });
 
   app.get("/api/market/graduating", async (_request, reply) => {
     const tokens = await adapter.getGraduatingTokens(20);
+    reply.header("Cache-Control", "public, max-age=5, stale-while-revalidate=15");
     return reply.send({ tokens });
   });
 
   app.get("/api/market/graduated", async (_request, reply) => {
     const tokens = await adapter.getGraduatedTokens(20);
+    reply.header("Cache-Control", "public, max-age=5, stale-while-revalidate=15");
     return reply.send({ tokens });
   });
 
@@ -121,6 +129,7 @@ export async function marketRoutes(app: FastifyInstance) {
     );
 
     const tokens = await adapter.getFilteredTokens(cleaned);
+    reply.header("Cache-Control", "public, max-age=5, stale-while-revalidate=15");
     return reply.send({ tokens });
   });
 }
