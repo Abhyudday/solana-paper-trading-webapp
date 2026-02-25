@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useCallback, useRef, useEffect } from "react";
+import { useState, useMemo, useCallback, useRef, useEffect, Fragment } from "react";
 import { useQuery, useQueryClient, keepPreviousData } from "@tanstack/react-query";
 import { api, TokenInfo, TokenFilterParams, FilteredTokenItem } from "@/lib/api";
 import { formatCompact, formatPrice, shortenAddress } from "@/lib/format";
@@ -52,6 +52,7 @@ function sortTokens(tokens: DisplayToken[], key: SortKey): DisplayToken[] {
 
 function TokenCard({ token, isNew }: { token: DisplayToken; isNew?: boolean }) {
   const queryClient = useQueryClient();
+  const [imgError, setImgError] = useState(false);
 
   const handlePrefetch = useCallback(() => {
     queryClient.prefetchQuery({
@@ -69,26 +70,22 @@ function TokenCard({ token, isNew }: { token: DisplayToken; isNew?: boolean }) {
   return (
     <Link
       href={`/token/${token.mint}`}
-      className={`block rounded border border-border bg-bg-card p-2.5 hover:border-accent-green/40 transition-colors group ${isNew ? "token-card-enter" : ""}`}
+      className={`token-card block rounded-lg border border-border bg-bg-card p-3.5 hover:border-accent-green/50 hover:bg-bg-card/80 transition-all duration-200 group ${isNew ? "token-card-enter" : ""}`}
       onMouseEnter={handlePrefetch}
     >
-      <div className="flex items-start gap-2.5">
+      <div className="flex items-center gap-3">
         {/* Token Avatar */}
         <div className="flex-shrink-0">
-          {token.image ? (
+          {token.image && !imgError ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
               src={token.image}
               alt={token.symbol}
-              className="h-10 w-10 rounded-full object-cover bg-bg-tertiary ring-1 ring-border"
-              onError={(e) => {
-                (e.target as HTMLImageElement).style.display = "none";
-                (e.target as HTMLImageElement).nextElementSibling?.classList.remove("hidden");
-              }}
+              className="h-11 w-11 rounded-full object-cover bg-bg-tertiary ring-2 ring-border group-hover:ring-accent-green/30 transition-all"
+              onError={() => setImgError(true)}
             />
-          ) : null}
-          {!token.image && (
-            <div className="h-10 w-10 rounded-full bg-bg-tertiary flex items-center justify-center text-xs font-bold text-text-muted ring-1 ring-border">
+          ) : (
+            <div className="h-11 w-11 rounded-full bg-gradient-to-br from-bg-tertiary to-bg-secondary flex items-center justify-center text-sm font-bold text-text-muted ring-2 ring-border group-hover:ring-accent-green/30 transition-all">
               {token.symbol?.charAt(0) || "?"}
             </div>
           )}
@@ -96,33 +93,38 @@ function TokenCard({ token, isNew }: { token: DisplayToken; isNew?: boolean }) {
 
         {/* Token Info */}
         <div className="flex-1 min-w-0">
-          <div className="flex items-center justify-between gap-1">
-            <div className="flex items-center gap-1 min-w-0">
-              <span className="font-bold text-[13px] text-text-primary truncate">{token.symbol}</span>
-              <span className="text-[10px] text-text-muted truncate max-w-[80px]">{token.name}</span>
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-1.5 min-w-0">
+              <span className="font-bold text-sm text-text-primary truncate">{token.symbol}</span>
+              <span className="text-[11px] text-text-muted truncate max-w-[100px]">{token.name}</span>
             </div>
-            <div className="flex items-center gap-2 flex-shrink-0">
-              <span className="text-[10px] text-text-muted">V <span className="text-text-secondary">{formatCompact(token.volume24h || 0).replace("$", "")}</span></span>
-              <span className="text-[10px] text-text-muted">MC <span className="text-accent-green">{formatCompact(token.marketCap).replace("$", "")}</span></span>
-            </div>
+            <span className="text-sm font-mono font-semibold text-accent-green flex-shrink-0">
+              {formatPrice(token.price)}
+            </span>
           </div>
 
           {/* Stats Row */}
-          <div className="flex items-center gap-2 mt-1">
+          <div className="flex items-center gap-3 mt-1.5">
             <span className="text-[10px] font-mono text-text-muted">
               {shortenAddress(token.mint, 4)}
             </span>
           </div>
+        </div>
+      </div>
 
-          {/* Bottom badges */}
-          <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
-            <span className="text-[9px] font-mono bg-bg-tertiary text-accent-green px-1.5 py-0.5 rounded">
-              {formatPrice(token.price)}
-            </span>
-            <span className="text-[9px] bg-bg-tertiary text-text-muted px-1.5 py-0.5 rounded">
-              Liq {formatCompact(token.liquidity).replace("$", "")}
-            </span>
-          </div>
+      {/* Bottom Stats Bar */}
+      <div className="flex items-center justify-between mt-3 pt-2.5 border-t border-border/50">
+        <div className="flex items-center gap-1">
+          <span className="text-[10px] text-text-muted">MC</span>
+          <span className="text-[11px] font-mono font-medium text-text-primary">{formatCompact(token.marketCap)}</span>
+        </div>
+        <div className="flex items-center gap-1">
+          <span className="text-[10px] text-text-muted">Vol</span>
+          <span className="text-[11px] font-mono font-medium text-text-secondary">{formatCompact(token.volume24h || 0)}</span>
+        </div>
+        <div className="flex items-center gap-1">
+          <span className="text-[10px] text-text-muted">Liq</span>
+          <span className="text-[11px] font-mono font-medium text-text-secondary">{formatCompact(token.liquidity)}</span>
         </div>
       </div>
     </Link>
@@ -215,11 +217,11 @@ function TokenColumn({
   return (
     <div className="flex flex-col min-w-0">
       {/* Column Header */}
-      <div className="flex items-center justify-between mb-1 px-0.5 py-1.5 border-b border-border">
-        <div className="flex items-center gap-1.5">
-          <span className={`h-1.5 w-1.5 rounded-full ${color}`} />
-          <h2 className="text-[11px] font-semibold text-text-primary">{title}</h2>
-          <span className="text-[10px] text-text-muted">({displayTokens.length})</span>
+      <div className="flex items-center justify-between mb-2 px-1 py-2 border-b border-border">
+        <div className="flex items-center gap-2">
+          <span className={`h-2 w-2 rounded-full ${color} shadow-sm`} style={{ boxShadow: `0 0 6px ${color === 'bg-accent-green' ? '#00c853' : color === 'bg-accent-yellow' ? '#ffd600' : '#3b8bff'}40` }} />
+          <h2 className="text-xs font-bold text-text-primary uppercase tracking-wide">{title}</h2>
+          <span className="text-[10px] text-text-muted font-mono bg-bg-tertiary px-1.5 py-0.5 rounded">{displayTokens.length}</span>
         </div>
         <div className="flex items-center gap-1">
           {/* Sort pills */}
@@ -227,10 +229,10 @@ function TokenColumn({
             <button
               key={opt.key}
               onClick={() => setSort(opt.key)}
-              className={`px-1.5 py-0.5 rounded text-[9px] font-medium transition-colors ${
+              className={`px-2 py-1 rounded text-[10px] font-medium transition-all ${
                 sort === opt.key
-                  ? "bg-bg-tertiary text-text-primary"
-                  : "text-text-muted hover:text-text-secondary"
+                  ? "bg-bg-tertiary text-text-primary shadow-sm"
+                  : "text-text-muted hover:text-text-secondary hover:bg-bg-tertiary/50"
               }`}
             >
               {opt.label}
@@ -238,13 +240,13 @@ function TokenColumn({
           ))}
           <button
             onClick={onOpenFilter}
-            className={`ml-0.5 flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] font-medium transition-colors ${
+            className={`ml-1 flex items-center gap-1 px-2 py-1 rounded text-[10px] font-medium transition-all ${
               hasFilters
                 ? "bg-accent-blue/15 text-accent-blue"
-                : "text-text-muted hover:text-text-secondary"
+                : "text-text-muted hover:text-text-secondary hover:bg-bg-tertiary/50"
             }`}
           >
-            <svg className="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
             </svg>
             {filterCount > 0 && <span>{filterCount}</span>}
@@ -252,25 +254,25 @@ function TokenColumn({
         </div>
       </div>
 
-      {/* Token list */}
-      <div className="flex flex-col gap-1 overflow-y-auto max-h-[calc(100vh-120px)] pr-0.5 scrollbar-thin pt-1">
+      {/* Token list — shows ~6-7 cards with smooth scroll for more */}
+      <div className="flex flex-col gap-2 overflow-y-auto max-h-[calc(100vh-130px)] pr-1 scroll-smooth token-list-scroll pt-1.5">
         {loading ? (
-          Array.from({ length: 8 }).map((_, i) => (
-            <div key={i} className="rounded border border-border bg-bg-card p-2.5 animate-pulse h-[80px]" />
+          Array.from({ length: 6 }).map((_, i) => (
+            <div key={i} className="rounded-lg border border-border bg-bg-card p-3.5 animate-pulse h-[100px]" />
           ))
         ) : displayTokens.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-12 text-text-muted">
+          <div className="flex flex-col items-center justify-center py-16 text-text-muted">
             {(isLoading || isFilterLoading) ? (
               <>
-                <div className="w-6 h-6 border-2 border-text-muted/30 border-t-accent-green rounded-full animate-spin mb-3" />
-                <span className="text-xs">Loading...</span>
+                <div className="w-7 h-7 border-2 border-text-muted/30 border-t-accent-green rounded-full animate-spin mb-3" />
+                <span className="text-xs">Loading tokens...</span>
               </>
             ) : (
               <>
                 <svg className="w-10 h-10 mb-2 opacity-30" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                 </svg>
-                <span className="text-xs">No Data</span>
+                <span className="text-xs">No tokens found</span>
               </>
             )}
           </div>
@@ -373,7 +375,7 @@ export default function LandingPage() {
   return (
     <div className="pt-2 pb-4">
       {/* 3-column trenches grid */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <TokenColumn
           title="New"
           defaultTokens={stableLatest}
