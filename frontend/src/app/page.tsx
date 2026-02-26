@@ -303,24 +303,27 @@ export default function LandingPage() {
   const { data: latestData, isLoading: latestLoading } = useQuery({
     queryKey: ["latestTokens"],
     queryFn: () => api.market.getLatestTokens(),
-    refetchInterval: 1_500,
-    staleTime: 1_000,
+    refetchInterval: 5_000,
+    staleTime: 3_000,
+    refetchOnWindowFocus: false,
     placeholderData: keepPreviousData,
   });
 
   const { data: graduatingData, isLoading: graduatingLoading } = useQuery({
     queryKey: ["graduatingTokens"],
     queryFn: () => api.market.getGraduatingTokens(),
-    refetchInterval: 1_500,
-    staleTime: 1_000,
+    refetchInterval: 5_000,
+    staleTime: 3_000,
+    refetchOnWindowFocus: false,
     placeholderData: keepPreviousData,
   });
 
   const { data: graduatedData, isLoading: graduatedLoading } = useQuery({
     queryKey: ["graduatedTokens"],
     queryFn: () => api.market.getGraduatedTokens(),
-    refetchInterval: 1_500,
-    staleTime: 1_000,
+    refetchInterval: 5_000,
+    staleTime: 3_000,
+    refetchOnWindowFocus: false,
     placeholderData: keepPreviousData,
   });
 
@@ -344,8 +347,9 @@ export default function LandingPage() {
     queryKey: ["filteredNew", columnFilters.new],
     queryFn: () => api.market.getFilteredTokens({ ...columnFilters.new, sortBy: "createdAt", sortOrder: "desc" }),
     enabled: newHasFilters,
-    refetchInterval: 1_500,
-    staleTime: 1_000,
+    refetchInterval: 5_000,
+    staleTime: 3_000,
+    refetchOnWindowFocus: false,
     placeholderData: keepPreviousData,
   });
 
@@ -353,8 +357,9 @@ export default function LandingPage() {
     queryKey: ["filteredMigrating", columnFilters.migrating],
     queryFn: () => api.market.getFilteredTokens({ ...columnFilters.migrating, status: "graduating" }),
     enabled: migratingHasFilters,
-    refetchInterval: 1_500,
-    staleTime: 1_000,
+    refetchInterval: 5_000,
+    staleTime: 3_000,
+    refetchOnWindowFocus: false,
     placeholderData: keepPreviousData,
   });
 
@@ -362,8 +367,9 @@ export default function LandingPage() {
     queryKey: ["filteredMigrated", columnFilters.migrated],
     queryFn: () => api.market.getFilteredTokens({ ...columnFilters.migrated, status: "graduated" }),
     enabled: migratedHasFilters,
-    refetchInterval: 1_500,
-    staleTime: 1_000,
+    refetchInterval: 5_000,
+    staleTime: 3_000,
+    refetchOnWindowFocus: false,
     placeholderData: keepPreviousData,
   });
 

@@ -19,7 +19,7 @@ function getToken(): string | null {
 }
 
 const responseCache = new Map<string, { data: unknown; ts: number }>();
-const CACHE_FRESH_MS = 500;     // serve instantly without background fetch
+const CACHE_FRESH_MS = 2_000;   // serve instantly without background fetch
 const CACHE_STALE_MS = 30_000;  // serve stale data for up to 30s while refreshing
 const CACHE_MAX_SIZE = 300;
 const inflight = new Map<string, Promise<unknown>>();

@@ -176,7 +176,7 @@ export class SolanaTrackerAdapter implements MarketDataAdapter {
     const cached = await safeGet(CACHE_KEYS.topTokens());
     if (cached) {
       const parsed = JSON.parse(cached) as TokenInfo[];
-      memCache.set("market:top", parsed, 2);
+      memCache.set("market:top", parsed, 10);
       return parsed.slice(0, limit);
     }
 
@@ -211,7 +211,7 @@ export class SolanaTrackerAdapter implements MarketDataAdapter {
           };
         });
 
-      memCache.set("market:top", tokens, 2);
+      memCache.set("market:top", tokens, 10);
       await safeSet(CACHE_KEYS.topTokens(), JSON.stringify(tokens), "EX", CACHE_TTL_TOP);
       return tokens;
     } catch {
@@ -227,7 +227,7 @@ export class SolanaTrackerAdapter implements MarketDataAdapter {
     const cached = await safeGet(cacheKey);
     if (cached) {
       const parsed = JSON.parse(cached) as TokenInfo[];
-      memCache.set(cacheKey, parsed, 1);
+      memCache.set(cacheKey, parsed, 5);
       return parsed.slice(0, limit);
     }
 
@@ -262,8 +262,8 @@ export class SolanaTrackerAdapter implements MarketDataAdapter {
           };
         });
 
-      memCache.set(cacheKey, tokens, 1);
-      await safeSet(cacheKey, JSON.stringify(tokens), "EX", 10);
+      memCache.set(cacheKey, tokens, 5);
+      await safeSet(cacheKey, JSON.stringify(tokens), "EX", 30);
       return tokens;
     } catch {
       const stale = await safeGet(cacheKey);
@@ -280,7 +280,7 @@ export class SolanaTrackerAdapter implements MarketDataAdapter {
     const cached = await safeGet(cacheKey);
     if (cached) {
       const parsed = JSON.parse(cached) as TokenInfo[];
-      memCache.set(cacheKey, parsed, 1);
+      memCache.set(cacheKey, parsed, 5);
       return parsed.slice(0, limit);
     }
 
@@ -315,8 +315,8 @@ export class SolanaTrackerAdapter implements MarketDataAdapter {
           };
         });
 
-      memCache.set(cacheKey, tokens, 1);
-      await safeSet(cacheKey, JSON.stringify(tokens), "EX", 10);
+      memCache.set(cacheKey, tokens, 5);
+      await safeSet(cacheKey, JSON.stringify(tokens), "EX", 30);
       return tokens;
     } catch {
       const stale = await safeGet(cacheKey);
@@ -378,44 +378,63 @@ export class SolanaTrackerAdapter implements MarketDataAdapter {
     const cached = await safeGet(cacheKey);
     if (cached) {
       const parsed = JSON.parse(cached) as TokenInfo[];
-      memCache.set(cacheKey, parsed, 1);
+      memCache.set(cacheKey, parsed, 5);
       return parsed.slice(0, limit);
     }
 
     try {
-      const data = await fetchApi<Array<{
-        token?: { mint?: string; symbol?: string; name?: string; decimals?: number; image?: string };
-        pools?: Array<{
-          price?: { usd?: number };
-          liquidity?: { usd?: number };
-          marketCap?: { usd?: number };
-          volume?: { h24?: number };
+      // Note: "tokens/multi/graduating" does NOT exist on SolanaTracker API.
+      // Use the search endpoint with status=graduating filter instead.
+      const data = await fetchApi<{
+        status?: string;
+        data?: Array<{
+          mint?: string;
+          symbol?: string;
+          name?: string;
+          image?: string;
+          priceUsd?: number;
+          marketCapUsd?: number;
+          liquidityUsd?: number;
+          volume_24h?: number;
+          volume?: number;
         }>;
-      }>>("tokens/multi/graduating");
+      }>("search", {
+        status: "graduating",
+        sortBy: "marketCap",
+        sortOrder: "desc",
+        limit: String(limit),
+      });
 
-      const items = Array.isArray(data) ? data : [];
-      const tokens: TokenInfo[] = items
-        .filter((item) => item.token?.mint && item.token?.symbol)
+      const items = data.data || (Array.isArray(data) ? (data as unknown[]) : []);
+      const tokens: TokenInfo[] = (items as Array<{
+        mint?: string;
+        symbol?: string;
+        name?: string;
+        image?: string;
+        priceUsd?: number;
+        marketCapUsd?: number;
+        liquidityUsd?: number;
+        volume_24h?: number;
+        volume?: number;
+      }>)
+        .filter((item) => item.mint && item.symbol)
         .slice(0, limit)
-        .map((item) => {
-          const pool = item.pools?.[0];
-          return {
-            mint: item.token?.mint || "",
-            symbol: item.token?.symbol || "",
-            name: item.token?.name || "",
-            decimals: item.token?.decimals || 9,
-            supply: 0,
-            liquidity: pool?.liquidity?.usd || 0,
-            price: pool?.price?.usd || 0,
-            marketCap: pool?.marketCap?.usd || 0,
-            image: item.token?.image,
-            volume24h: pool?.volume?.h24 || 0,
-          };
-        });
+        .map((item) => ({
+          mint: item.mint || "",
+          symbol: item.symbol || "",
+          name: item.name || "",
+          decimals: 9,
+          supply: 0,
+          liquidity: item.liquidityUsd || 0,
+          price: item.priceUsd || 0,
+          marketCap: item.marketCapUsd || 0,
+          image: item.image,
+          volume24h: item.volume_24h || item.volume || 0,
+        }));
 
       if (tokens.length > 0) {
-        memCache.set(cacheKey, tokens, 1);
-        await safeSet(cacheKey, JSON.stringify(tokens), "EX", 5);
+        memCache.set(cacheKey, tokens, 5);
+        await safeSet(cacheKey, JSON.stringify(tokens), "EX", 15);
       }
       return tokens;
     } catch {
@@ -433,7 +452,7 @@ export class SolanaTrackerAdapter implements MarketDataAdapter {
     const cached = await safeGet(cacheKey);
     if (cached) {
       const parsed = JSON.parse(cached) as TokenInfo[];
-      memCache.set(cacheKey, parsed, 1);
+      memCache.set(cacheKey, parsed, 5);
       return parsed.slice(0, limit);
     }
 
@@ -469,8 +488,8 @@ export class SolanaTrackerAdapter implements MarketDataAdapter {
         });
 
       if (tokens.length > 0) {
-        memCache.set(cacheKey, tokens, 1);
-        await safeSet(cacheKey, JSON.stringify(tokens), "EX", 5);
+        memCache.set(cacheKey, tokens, 5);
+        await safeSet(cacheKey, JSON.stringify(tokens), "EX", 30);
       }
       return tokens;
     } catch {
