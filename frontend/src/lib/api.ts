@@ -149,6 +149,8 @@ export const api = {
     getLatestTokens: () => request<{ tokens: TokenInfo[] }>("/api/market/latest"),
     getTrendingTokens: () => request<{ tokens: TokenInfo[] }>("/api/market/trending"),
     getTokenTrades: (mint: string) => request<{ trades: TokenTrade[] }>(`/api/market/tokens/${mint}/trades`),
+    getTokenHolders: (mint: string) => request<TokenHolderInfo>(`/api/market/tokens/${mint}/holders`),
+    getTokenBundles: (mint: string) => request<BundleInfo>(`/api/market/tokens/${mint}/bundles`),
     getGraduatingTokens: () => request<{ tokens: TokenInfo[] }>("/api/market/graduating"),
     getGraduatedTokens: () => request<{ tokens: TokenInfo[] }>("/api/market/graduated"),
     getFilteredTokens: (filters: TokenFilterParams) => {
@@ -170,6 +172,18 @@ export const api = {
     get: () => request<Portfolio>("/api/portfolio"),
     getTrades: (limit = 50, offset = 0) =>
       request<{ trades: Trade[] }>(`/api/portfolio/trades?limit=${limit}&offset=${offset}`),
+    getAnalytics: () => request<PortfolioAnalytics>("/api/portfolio/analytics"),
+  },
+  orders: {
+    create: (params: CreateLimitOrderParams) =>
+      request<LimitOrderResult>("/api/orders", {
+        method: "POST",
+        body: JSON.stringify(params),
+      }),
+    getAll: (status?: "open" | "filled" | "cancelled") =>
+      request<{ orders: LimitOrderResult[] }>(`/api/orders${status ? `?status=${status}` : ""}`),
+    cancel: (orderId: string) =>
+      request<{ success: boolean }>(`/api/orders/${orderId}`, { method: "DELETE" }),
   },
 };
 
@@ -180,6 +194,13 @@ export interface TokenSearchResult {
   image?: string;
   price?: number;
   marketCap?: number;
+}
+
+export interface TokenSocials {
+  twitter?: string;
+  telegram?: string;
+  website?: string;
+  discord?: string;
 }
 
 export interface TokenInfo {
@@ -193,6 +214,35 @@ export interface TokenInfo {
   marketCap: number;
   image?: string;
   volume24h?: number;
+  socials?: TokenSocials;
+}
+
+export interface TokenHolder {
+  address: string;
+  amount: number;
+  percentage: number;
+  isInsider?: boolean;
+}
+
+export interface TokenHolderInfo {
+  totalHolders: number;
+  topHolders: TokenHolder[];
+  top10Pct: number;
+  top20Pct: number;
+}
+
+export interface BundleDetail {
+  wallet: string;
+  amount: number;
+  percentage: number;
+  tx: string;
+}
+
+export interface BundleInfo {
+  bundled: boolean;
+  bundleCount: number;
+  bundlePercentage: number;
+  details: BundleDetail[];
 }
 
 export interface OHLCVBar {
@@ -314,4 +364,42 @@ export interface FilteredTokenItem {
   curvePercentage?: number;
   feesTotal?: number;
   createdAt?: number;
+}
+
+export interface PortfolioAnalytics {
+  totalTrades: number;
+  winCount: number;
+  lossCount: number;
+  winRate: number;
+  avgWin: number;
+  avgLoss: number;
+  profitFactor: number;
+  maxDrawdown: number;
+  sharpeRatio: number;
+  bestTrade: { mint: string; pnl: number; date: string } | null;
+  worstTrade: { mint: string; pnl: number; date: string } | null;
+  dailyPnl: { date: string; pnl: number; cumulative: number }[];
+}
+
+export interface CreateLimitOrderParams {
+  mint: string;
+  side: "buy" | "sell";
+  orderType: "limit" | "stop_loss" | "take_profit";
+  qty: number;
+  triggerPrice: number;
+  note?: string;
+}
+
+export interface LimitOrderResult {
+  id: string;
+  mint: string;
+  side: string;
+  orderType: string;
+  qty: number;
+  triggerPrice: number;
+  status: string;
+  note: string | null;
+  createdAt: string;
+  filledAt?: string;
+  filledPrice?: number;
 }

@@ -7,6 +7,13 @@ export interface TokenSearchResult {
   marketCap?: number;
 }
 
+export interface TokenSocials {
+  twitter?: string;
+  telegram?: string;
+  website?: string;
+  discord?: string;
+}
+
 export interface TokenInfo {
   mint: string;
   symbol: string;
@@ -18,6 +25,33 @@ export interface TokenInfo {
   marketCap: number;
   image?: string;
   volume24h?: number;
+  socials?: TokenSocials;
+}
+
+export interface TokenHolder {
+  address: string;
+  amount: number;
+  percentage: number;
+  isInsider?: boolean;
+}
+
+export interface TokenHolderInfo {
+  totalHolders: number;
+  topHolders: TokenHolder[];
+  top10Pct: number;
+  top20Pct: number;
+}
+
+export interface BundleInfo {
+  bundled: boolean;
+  bundleCount: number;
+  bundlePercentage: number;
+  details: Array<{
+    wallet: string;
+    amount: number;
+    percentage: number;
+    tx: string;
+  }>;
 }
 
 export interface OHLCVBar {
@@ -29,7 +63,7 @@ export interface OHLCVBar {
   volume: number;
 }
 
-export type ChartRange = "1d" | "7d" | "30d";
+export type ChartRange = "1s" | "5s" | "15s" | "30s" | "1m" | "5m" | "15m" | "30m" | "1h" | "6h" | "1d" | "7d" | "30d";
 
 export interface TokenTrade {
   tx: string;
@@ -99,4 +133,6 @@ export interface MarketDataAdapter {
   getGraduatingTokens(limit: number): Promise<TokenInfo[]>;
   getGraduatedTokens(limit: number): Promise<TokenInfo[]>;
   getFilteredTokens(filters: TokenFilterParams): Promise<FilteredTokenItem[]>;
+  getTokenHolders(mint: string): Promise<TokenHolderInfo>;
+  getTokenBundles(mint: string): Promise<BundleInfo>;
 }

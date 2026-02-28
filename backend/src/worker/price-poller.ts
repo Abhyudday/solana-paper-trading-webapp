@@ -2,6 +2,7 @@ import { Queue, Worker } from "bullmq";
 import { redis, redisConnected, safeSet, safePublish, CACHE_KEYS, CHANNELS } from "../lib/redis";
 import { SolanaTrackerAdapter } from "../adapters/solana-tracker";
 import { prisma } from "../lib/prisma";
+import { checkAndFillLimitOrders } from "../services/limit-order";
 
 const POLL_INTERVAL_MS = 15000;
 const adapter = new SolanaTrackerAdapter();
@@ -48,6 +49,14 @@ export async function startPricePoller() {
         } catch (err) {
           console.error(`Price poll failed for ${mint}:`, err);
         }
+      }
+
+      // Check and fill any triggered limit orders
+      try {
+        const filled = await checkAndFillLimitOrders();
+        if (filled > 0) console.log(`Filled ${filled} limit order(s)`);
+      } catch (err) {
+        console.error("Limit order check failed:", err);
       }
     },
     { connection }

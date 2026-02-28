@@ -3,11 +3,11 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/context/AuthContext";
-import { api } from "@/lib/api";
-import { formatUSD, formatPnl, formatPercent, formatPrice, formatNumber, timeAgo } from "@/lib/format";
+import { api, PortfolioAnalytics, LimitOrderResult } from "@/lib/api";
+import { formatUSD, formatPnl, formatPercent, formatPrice, formatNumber, timeAgo, shortenAddress } from "@/lib/format";
 import Link from "next/link";
 
-type Tab = "holding" | "history";
+type Tab = "holding" | "history" | "analytics" | "orders";
 
 export default function PortfolioPage() {
   const { isAuthenticated } = useAuth();
@@ -25,6 +25,20 @@ export default function PortfolioPage() {
     queryFn: () => api.portfolio.getTrades(50, 0),
     enabled: isAuthenticated,
     refetchInterval: 15000,
+  });
+
+  const { data: analytics } = useQuery({
+    queryKey: ["portfolioAnalytics"],
+    queryFn: () => api.portfolio.getAnalytics(),
+    enabled: isAuthenticated && tab === "analytics",
+    staleTime: 30_000,
+  });
+
+  const { data: ordersData } = useQuery({
+    queryKey: ["limitOrders"],
+    queryFn: () => api.orders.getAll(),
+    enabled: isAuthenticated,
+    refetchInterval: 10_000,
   });
 
   if (!isAuthenticated) {
@@ -109,23 +123,31 @@ export default function PortfolioPage() {
 
       {/* Tab Bar */}
       <div className="flex items-center gap-0 border-b border-border mb-3">
-        {(["holding", "history"] as Tab[]).map((t) => (
-          <button
-            key={t}
-            onClick={() => setTab(t)}
-            className={`px-4 py-2 text-xs font-semibold transition-colors border-b-2 ${
-              tab === t
-                ? "border-accent-green text-text-primary"
-                : "border-transparent text-text-muted hover:text-text-secondary"
-            }`}
-          >
-            {t === "holding" ? `Holding (${portfolio.positions.length})` : `History (${tradesData?.trades?.length || 0})`}
-          </button>
-        ))}
+        {(["holding", "history", "orders", "analytics"] as Tab[]).map((t) => {
+          const labels: Record<Tab, string> = {
+            holding: `Holding (${portfolio.positions.length})`,
+            history: `History (${tradesData?.trades?.length || 0})`,
+            orders: `Orders (${ordersData?.orders?.length || 0})`,
+            analytics: "Analytics",
+          };
+          return (
+            <button
+              key={t}
+              onClick={() => setTab(t)}
+              className={`px-4 py-2 text-xs font-semibold transition-colors border-b-2 ${
+                tab === t
+                  ? "border-accent-green text-text-primary"
+                  : "border-transparent text-text-muted hover:text-text-secondary"
+              }`}
+            >
+              {labels[t]}
+            </button>
+          );
+        })}
       </div>
 
       {/* Tab Content */}
-      {tab === "holding" ? (
+      {tab === "holding" && (
         <div>
           {portfolio.positions.length === 0 ? (
             <div className="rounded border border-border bg-bg-card p-8 text-center">
@@ -167,7 +189,9 @@ export default function PortfolioPage() {
             </div>
           )}
         </div>
-      ) : (
+      )}
+
+      {tab === "history" && (
         <div>
           {!tradesData?.trades || tradesData.trades.length === 0 ? (
             <div className="rounded border border-border bg-bg-card p-8 text-center text-text-muted text-xs">
@@ -217,6 +241,179 @@ export default function PortfolioPage() {
                   ))}
                 </tbody>
               </table>
+            </div>
+          )}
+        </div>
+      )}
+
+      {tab === "orders" && (
+        <div>
+          {!ordersData?.orders || ordersData.orders.length === 0 ? (
+            <div className="rounded border border-border bg-bg-card p-8 text-center text-text-muted text-xs">
+              No orders yet. Place limit orders, stop-losses, or take-profits from any token page.
+            </div>
+          ) : (
+            <div className="rounded border border-border bg-bg-card overflow-hidden">
+              <table className="w-full text-[11px]" aria-label="Limit orders">
+                <thead>
+                  <tr className="border-b border-border bg-bg-secondary">
+                    <th className="text-left px-3 py-2 text-[10px] font-semibold text-text-muted">Type</th>
+                    <th className="text-left px-3 py-2 text-[10px] font-semibold text-text-muted">Side</th>
+                    <th className="text-left px-3 py-2 text-[10px] font-semibold text-text-muted">Token</th>
+                    <th className="text-right px-3 py-2 text-[10px] font-semibold text-text-muted">Qty</th>
+                    <th className="text-right px-3 py-2 text-[10px] font-semibold text-text-muted">Trigger</th>
+                    <th className="text-center px-3 py-2 text-[10px] font-semibold text-text-muted">Status</th>
+                    <th className="text-right px-3 py-2 text-[10px] font-semibold text-text-muted">Created</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {ordersData.orders.map((order) => (
+                    <tr key={order.id} className="border-b border-border/30 hover:bg-bg-tertiary/20 transition-colors">
+                      <td className="px-3 py-2">
+                        <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-bg-tertiary text-text-secondary">
+                          {order.orderType === "limit" ? "LIMIT" : order.orderType === "stop_loss" ? "STOP" : "TP"}
+                        </span>
+                      </td>
+                      <td className="px-3 py-2">
+                        <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${
+                          order.side === "buy" ? "bg-accent-green/15 text-accent-green" : "bg-accent-red/15 text-accent-red"
+                        }`}>
+                          {order.side.toUpperCase()}
+                        </span>
+                      </td>
+                      <td className="px-3 py-2">
+                        <Link href={`/token/${order.mint}`} className="text-accent-blue hover:underline font-mono">
+                          {shortenAddress(order.mint, 4)}
+                        </Link>
+                      </td>
+                      <td className="text-right px-3 py-2 font-mono">{formatNumber(order.qty, 4)}</td>
+                      <td className="text-right px-3 py-2 font-mono text-text-secondary">{formatPrice(order.triggerPrice)}</td>
+                      <td className="text-center px-3 py-2">
+                        <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${
+                          order.status === "open" ? "bg-accent-blue/15 text-accent-blue" :
+                          order.status === "filled" ? "bg-accent-green/15 text-accent-green" :
+                          "bg-accent-red/15 text-accent-red"
+                        }`}>
+                          {order.status.toUpperCase()}
+                        </span>
+                      </td>
+                      <td className="text-right px-3 py-2 text-text-muted">{timeAgo(order.createdAt)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+
+      {tab === "analytics" && (
+        <div>
+          {!analytics ? (
+            <div className="rounded border border-border bg-bg-card p-8 text-center">
+              <div className="h-6 w-6 border-2 border-accent-green border-t-transparent rounded-full animate-spin mx-auto mb-2" />
+              <div className="text-text-muted text-xs">Loading analytics...</div>
+            </div>
+          ) : analytics.totalTrades === 0 ? (
+            <div className="rounded border border-border bg-bg-card p-8 text-center text-text-muted text-xs">
+              Complete some trades to see analytics.
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {/* Key metrics row */}
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                <div className="rounded border border-border bg-bg-card p-3">
+                  <div className="text-[9px] text-text-muted uppercase tracking-wider">Win Rate</div>
+                  <div className={`text-lg font-bold font-mono ${analytics.winRate >= 50 ? "text-accent-green" : "text-accent-red"}`}>
+                    {analytics.winRate.toFixed(1)}%
+                  </div>
+                  <div className="text-[9px] text-text-muted mt-0.5">
+                    {analytics.winCount}W / {analytics.lossCount}L
+                  </div>
+                </div>
+                <div className="rounded border border-border bg-bg-card p-3">
+                  <div className="text-[9px] text-text-muted uppercase tracking-wider">Sharpe Ratio</div>
+                  <div className={`text-lg font-bold font-mono ${analytics.sharpeRatio >= 1 ? "text-accent-green" : analytics.sharpeRatio >= 0 ? "text-accent-yellow" : "text-accent-red"}`}>
+                    {analytics.sharpeRatio.toFixed(2)}
+                  </div>
+                  <div className="text-[9px] text-text-muted mt-0.5">Annualized</div>
+                </div>
+                <div className="rounded border border-border bg-bg-card p-3">
+                  <div className="text-[9px] text-text-muted uppercase tracking-wider">Max Drawdown</div>
+                  <div className="text-lg font-bold font-mono text-accent-red">
+                    {formatUSD(analytics.maxDrawdown)}
+                  </div>
+                  <div className="text-[9px] text-text-muted mt-0.5">Peak to trough</div>
+                </div>
+                <div className="rounded border border-border bg-bg-card p-3">
+                  <div className="text-[9px] text-text-muted uppercase tracking-wider">Profit Factor</div>
+                  <div className={`text-lg font-bold font-mono ${analytics.profitFactor >= 1 ? "text-accent-green" : "text-accent-red"}`}>
+                    {analytics.profitFactor === Infinity ? "∞" : analytics.profitFactor.toFixed(2)}
+                  </div>
+                  <div className="text-[9px] text-text-muted mt-0.5">Wins / Losses</div>
+                </div>
+              </div>
+
+              {/* Second row */}
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                <div className="rounded border border-border bg-bg-card p-3">
+                  <div className="text-[9px] text-text-muted uppercase tracking-wider">Total Trades</div>
+                  <div className="text-sm font-bold font-mono text-text-primary">{analytics.totalTrades}</div>
+                </div>
+                <div className="rounded border border-border bg-bg-card p-3">
+                  <div className="text-[9px] text-text-muted uppercase tracking-wider">Avg Win</div>
+                  <div className="text-sm font-bold font-mono text-accent-green">{formatUSD(analytics.avgWin)}</div>
+                </div>
+                <div className="rounded border border-border bg-bg-card p-3">
+                  <div className="text-[9px] text-text-muted uppercase tracking-wider">Avg Loss</div>
+                  <div className="text-sm font-bold font-mono text-accent-red">{formatUSD(analytics.avgLoss)}</div>
+                </div>
+                <div className="rounded border border-border bg-bg-card p-3">
+                  <div className="text-[9px] text-text-muted uppercase tracking-wider">Best / Worst</div>
+                  <div className="flex items-center gap-2">
+                    {analytics.bestTrade && (
+                      <span className="text-[10px] font-mono text-accent-green">{formatPnl(analytics.bestTrade.pnl)}</span>
+                    )}
+                    <span className="text-text-muted">/</span>
+                    {analytics.worstTrade && (
+                      <span className="text-[10px] font-mono text-accent-red">{formatPnl(analytics.worstTrade.pnl)}</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Daily P&L Table */}
+              {analytics.dailyPnl.length > 0 && (
+                <div className="rounded border border-border bg-bg-card overflow-hidden">
+                  <div className="px-3 py-2 border-b border-border bg-bg-secondary">
+                    <h3 className="text-[10px] font-semibold text-text-muted uppercase tracking-wider">Daily P&L</h3>
+                  </div>
+                  <div className="max-h-[300px] overflow-y-auto scrollbar-thin">
+                    <table className="w-full text-[11px]">
+                      <thead>
+                        <tr className="border-b border-border/50 sticky top-0 bg-bg-card">
+                          <th className="text-left px-3 py-1.5 text-[9px] font-semibold text-text-muted">Date</th>
+                          <th className="text-right px-3 py-1.5 text-[9px] font-semibold text-text-muted">Daily P&L</th>
+                          <th className="text-right px-3 py-1.5 text-[9px] font-semibold text-text-muted">Cumulative</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {[...analytics.dailyPnl].reverse().map((d) => (
+                          <tr key={d.date} className="border-b border-border/20 hover:bg-bg-tertiary/20">
+                            <td className="px-3 py-1.5 font-mono text-text-secondary">{d.date}</td>
+                            <td className={`text-right px-3 py-1.5 font-mono font-semibold ${d.pnl >= 0 ? "text-accent-green" : "text-accent-red"}`}>
+                              {formatPnl(d.pnl)}
+                            </td>
+                            <td className={`text-right px-3 py-1.5 font-mono ${d.cumulative >= 0 ? "text-accent-green" : "text-accent-red"}`}>
+                              {formatPnl(d.cumulative)}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>

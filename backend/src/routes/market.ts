@@ -79,6 +79,20 @@ export async function marketRoutes(app: FastifyInstance) {
     return reply.send({ trades });
   });
 
+  app.get("/api/market/tokens/:mint/holders", async (request, reply) => {
+    const { mint } = request.params as { mint: string };
+    const holders = await adapter.getTokenHolders(mint);
+    reply.header("Cache-Control", "public, max-age=30, stale-while-revalidate=60");
+    return reply.send(holders);
+  });
+
+  app.get("/api/market/tokens/:mint/bundles", async (request, reply) => {
+    const { mint } = request.params as { mint: string };
+    const bundles = await adapter.getTokenBundles(mint);
+    reply.header("Cache-Control", "public, max-age=60, stale-while-revalidate=120");
+    return reply.send(bundles);
+  });
+
   app.get("/api/market/graduating", async (_request, reply) => {
     const tokens = await adapter.getGraduatingTokens(20);
     reply.header("Cache-Control", "public, max-age=5, stale-while-revalidate=15");

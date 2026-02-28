@@ -11,6 +11,7 @@ import { shortenAddress } from "@/lib/format";
 
 const NAV_ITEMS = [
   { href: "/", label: "Trenches" },
+  { href: "/trending", label: "Trending" },
   { href: "/portfolio", label: "Portfolio", auth: true },
 ];
 

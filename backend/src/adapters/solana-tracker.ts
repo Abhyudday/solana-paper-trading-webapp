@@ -10,6 +10,9 @@ import type {
   TokenTrade,
   TokenFilterParams,
   FilteredTokenItem,
+  TokenHolderInfo,
+  TokenHolder,
+  BundleInfo,
 } from "./market-data";
 
 const CACHE_TTL_PRICE = 15; // seconds
@@ -40,9 +43,37 @@ async function fetchApi<T>(path: string, params?: Record<string, string>): Promi
 
 function rangeToSeconds(range: ChartRange): number {
   switch (range) {
-    case "1d": return 86400;
-    case "7d": return 604800;
-    case "30d": return 2592000;
+    case "1s": return 300;       // 5 min window for 1s candles
+    case "5s": return 900;       // 15 min window
+    case "15s": return 1800;     // 30 min window
+    case "30s": return 3600;     // 1h window
+    case "1m": return 3600;      // 1h window
+    case "5m": return 14400;     // 4h window
+    case "15m": return 43200;    // 12h window
+    case "30m": return 86400;    // 24h window
+    case "1h": return 172800;    // 48h window
+    case "6h": return 604800;    // 7d window
+    case "1d": return 2592000;   // 30d window
+    case "7d": return 7776000;   // 90d window
+    case "30d": return 31536000; // 365d window
+  }
+}
+
+function rangeToInterval(range: ChartRange): string {
+  switch (range) {
+    case "1s": return "1s";
+    case "5s": return "5s";
+    case "15s": return "15s";
+    case "30s": return "30s";
+    case "1m": return "1m";
+    case "5m": return "5m";
+    case "15m": return "15m";
+    case "30m": return "30m";
+    case "1h": return "1h";
+    case "6h": return "6h";
+    case "1d": return "1h";
+    case "7d": return "4h";
+    case "30d": return "1d";
   }
 }
 
@@ -85,7 +116,10 @@ export class SolanaTrackerAdapter implements MarketDataAdapter {
 
     try {
       const data = await fetchApi<{
-        token?: { mint?: string; symbol?: string; name?: string; decimals?: number; image?: string };
+        token?: {
+          mint?: string; symbol?: string; name?: string; decimals?: number; image?: string;
+          twitter?: string; telegram?: string; website?: string; discord?: string;
+        };
         pools?: Array<{
           price?: { usd?: number };
           liquidity?: { usd?: number };
@@ -96,6 +130,12 @@ export class SolanaTrackerAdapter implements MarketDataAdapter {
       }>(`/tokens/${mint}`);
 
       const pool = data.pools?.[0];
+      const socials: Record<string, string> = {};
+      if (data.token?.twitter) socials.twitter = data.token.twitter;
+      if (data.token?.telegram) socials.telegram = data.token.telegram;
+      if (data.token?.website) socials.website = data.token.website;
+      if (data.token?.discord) socials.discord = data.token.discord;
+
       const info: TokenInfo = {
         mint: data.token?.mint || mint,
         symbol: data.token?.symbol || "",
@@ -107,6 +147,7 @@ export class SolanaTrackerAdapter implements MarketDataAdapter {
         marketCap: pool?.marketCap?.usd || 0,
         image: data.token?.image,
         volume24h: pool?.volume?.h24 || 0,
+        socials: Object.keys(socials).length > 0 ? socials : undefined,
       };
 
       memCache.set(`ti:${mint}`, info, 15);
@@ -133,7 +174,10 @@ export class SolanaTrackerAdapter implements MarketDataAdapter {
 
     const now = Math.floor(Date.now() / 1000);
     const from = now - rangeToSeconds(range);
-    const interval = range === "1d" ? "1m" : range === "7d" ? "15m" : "1h";
+    const interval = rangeToInterval(range);
+    // Shorter cache for sub-minute timeframes
+    const isShortRange = ["1s", "5s", "15s", "30s", "1m"].includes(range);
+    const chartCacheTtl = isShortRange ? 5 : CACHE_TTL_CHART;
 
     try {
       const data = await fetchApi<{
@@ -161,8 +205,8 @@ export class SolanaTrackerAdapter implements MarketDataAdapter {
         volume: b.volume || 0,
       }));
 
-      memCache.set(cacheKey, bars, 15);
-      await safeSet(cacheKey, JSON.stringify(bars), "EX", CACHE_TTL_CHART);
+      memCache.set(cacheKey, bars, isShortRange ? 3 : 15);
+      await safeSet(cacheKey, JSON.stringify(bars), "EX", chartCacheTtl);
       return bars;
     } catch {
       return [];
@@ -382,12 +426,68 @@ export class SolanaTrackerAdapter implements MarketDataAdapter {
       return parsed.slice(0, limit);
     }
 
+    // Strategy: try tokens/multi/graduating first, then fall back to search endpoint
+    let tokens: TokenInfo[] = [];
+
     try {
-      // Note: "tokens/multi/graduating" does NOT exist on SolanaTracker API.
-      // Use the search endpoint with status=graduating filter instead.
-      const data = await fetchApi<{
-        status?: string;
-        data?: Array<{
+      const data = await fetchApi<Array<{
+        token?: { mint?: string; symbol?: string; name?: string; decimals?: number; image?: string };
+        pools?: Array<{
+          price?: { usd?: number };
+          liquidity?: { usd?: number };
+          marketCap?: { usd?: number };
+          volume?: { h24?: number };
+        }>;
+      }>>("tokens/multi/graduating");
+
+      const items = Array.isArray(data) ? data : [];
+      tokens = items
+        .filter((item) => item.token?.mint && item.token?.symbol)
+        .slice(0, limit)
+        .map((item) => {
+          const pool = item.pools?.[0];
+          return {
+            mint: item.token?.mint || "",
+            symbol: item.token?.symbol || "",
+            name: item.token?.name || "",
+            decimals: item.token?.decimals || 9,
+            supply: 0,
+            liquidity: pool?.liquidity?.usd || 0,
+            price: pool?.price?.usd || 0,
+            marketCap: pool?.marketCap?.usd || 0,
+            image: item.token?.image,
+            volume24h: pool?.volume?.h24 || 0,
+          };
+        });
+    } catch {
+      // tokens/multi/graduating not available, fall back to search endpoint
+    }
+
+    // Fallback: use search endpoint with status=graduating
+    if (tokens.length === 0) {
+      try {
+        const data = await fetchApi<{
+          status?: string;
+          data?: Array<{
+            mint?: string;
+            symbol?: string;
+            name?: string;
+            image?: string;
+            priceUsd?: number;
+            marketCapUsd?: number;
+            liquidityUsd?: number;
+            volume_24h?: number;
+            volume?: number;
+          }>;
+        }>("search", {
+          status: "graduating",
+          sortBy: "marketCap",
+          sortOrder: "desc",
+          limit: String(limit),
+        });
+
+        const items = data.data || (Array.isArray(data) ? (data as unknown[]) : []);
+        tokens = (items as Array<{
           mint?: string;
           symbol?: string;
           name?: string;
@@ -397,51 +497,60 @@ export class SolanaTrackerAdapter implements MarketDataAdapter {
           liquidityUsd?: number;
           volume_24h?: number;
           volume?: number;
-        }>;
-      }>("search", {
-        status: "graduating",
-        sortBy: "marketCap",
-        sortOrder: "desc",
-        limit: String(limit),
-      });
+        }>)
+          .filter((item) => item.mint && item.symbol)
+          .slice(0, limit)
+          .map((item) => ({
+            mint: item.mint || "",
+            symbol: item.symbol || "",
+            name: item.name || "",
+            decimals: 9,
+            supply: 0,
+            liquidity: item.liquidityUsd || 0,
+            price: item.priceUsd || 0,
+            marketCap: item.marketCapUsd || 0,
+            image: item.image,
+            volume24h: item.volume_24h || item.volume || 0,
+          }));
+      } catch {
+        // search fallback also failed
+      }
+    }
 
-      const items = data.data || (Array.isArray(data) ? (data as unknown[]) : []);
-      const tokens: TokenInfo[] = (items as Array<{
-        mint?: string;
-        symbol?: string;
-        name?: string;
-        image?: string;
-        priceUsd?: number;
-        marketCapUsd?: number;
-        liquidityUsd?: number;
-        volume_24h?: number;
-        volume?: number;
-      }>)
-        .filter((item) => item.mint && item.symbol)
-        .slice(0, limit)
-        .map((item) => ({
-          mint: item.mint || "",
-          symbol: item.symbol || "",
-          name: item.name || "",
+    // Final fallback: use filtered endpoint with graduating status
+    if (tokens.length === 0) {
+      try {
+        const filtered = await this.getFilteredTokens({
+          status: "graduating",
+          sortBy: "marketCap",
+          sortOrder: "desc",
+          limit,
+        });
+        tokens = filtered.map((item) => ({
+          mint: item.mint,
+          symbol: item.symbol,
+          name: item.name,
           decimals: 9,
           supply: 0,
-          liquidity: item.liquidityUsd || 0,
-          price: item.priceUsd || 0,
-          marketCap: item.marketCapUsd || 0,
+          liquidity: item.liquidity,
+          price: item.price,
+          marketCap: item.marketCap,
           image: item.image,
-          volume24h: item.volume_24h || item.volume || 0,
+          volume24h: item.volume24h,
         }));
-
-      if (tokens.length > 0) {
-        memCache.set(cacheKey, tokens, 5);
-        await safeSet(cacheKey, JSON.stringify(tokens), "EX", 15);
+      } catch {
+        // all methods failed
       }
-      return tokens;
-    } catch {
+    }
+
+    if (tokens.length > 0) {
+      memCache.set(cacheKey, tokens, 5);
+      await safeSet(cacheKey, JSON.stringify(tokens), "EX", 15);
+    } else {
       const stale = await safeGet(cacheKey);
       if (stale) return (JSON.parse(stale) as TokenInfo[]).slice(0, limit);
-      return [];
     }
+    return tokens;
   }
 
   async getGraduatedTokens(limit: number): Promise<TokenInfo[]> {
@@ -591,6 +700,102 @@ export class SolanaTrackerAdapter implements MarketDataAdapter {
         }));
     } catch {
       return [];
+    }
+  }
+
+  async getTokenHolders(mint: string): Promise<TokenHolderInfo> {
+    const cacheKey = `holders:${mint}`;
+    const memHit = memCache.get<TokenHolderInfo>(cacheKey);
+    if (memHit) return memHit;
+
+    const cached = await safeGet(cacheKey);
+    if (cached) {
+      const parsed = JSON.parse(cached) as TokenHolderInfo;
+      memCache.set(cacheKey, parsed, 30);
+      return parsed;
+    }
+
+    try {
+      const data = await fetchApi<{
+        total?: number;
+        accounts?: Array<{
+          owner?: string;
+          balance?: number;
+          percentage?: number;
+          insider?: boolean;
+        }>;
+      }>(`tokens/${mint}/holders`);
+
+      const accounts = data.accounts || [];
+      const topHolders: TokenHolder[] = accounts
+        .slice(0, 20)
+        .map((a) => ({
+          address: a.owner || "",
+          amount: a.balance || 0,
+          percentage: a.percentage || 0,
+          isInsider: a.insider,
+        }));
+
+      const top10Pct = topHolders.slice(0, 10).reduce((sum, h) => sum + h.percentage, 0);
+      const top20Pct = topHolders.reduce((sum, h) => sum + h.percentage, 0);
+
+      const result: TokenHolderInfo = {
+        totalHolders: data.total || accounts.length,
+        topHolders,
+        top10Pct,
+        top20Pct,
+      };
+
+      memCache.set(cacheKey, result, 30);
+      await safeSet(cacheKey, JSON.stringify(result), "EX", 60);
+      return result;
+    } catch {
+      return { totalHolders: 0, topHolders: [], top10Pct: 0, top20Pct: 0 };
+    }
+  }
+
+  async getTokenBundles(mint: string): Promise<BundleInfo> {
+    const cacheKey = `bundles:${mint}`;
+    const memHit = memCache.get<BundleInfo>(cacheKey);
+    if (memHit) return memHit;
+
+    const cached = await safeGet(cacheKey);
+    if (cached) {
+      const parsed = JSON.parse(cached) as BundleInfo;
+      memCache.set(cacheKey, parsed, 60);
+      return parsed;
+    }
+
+    try {
+      const data = await fetchApi<{
+        bundled?: boolean;
+        bundles?: Array<{
+          wallet?: string;
+          amount?: number;
+          percentage?: number;
+          tx?: string;
+        }>;
+      }>(`tokens/${mint}/bundles`);
+
+      const details = (data.bundles || []).map((b) => ({
+        wallet: b.wallet || "",
+        amount: b.amount || 0,
+        percentage: b.percentage || 0,
+        tx: b.tx || "",
+      }));
+
+      const result: BundleInfo = {
+        bundled: data.bundled || details.length > 0,
+        bundleCount: details.length,
+        bundlePercentage: details.reduce((sum, d) => sum + d.percentage, 0),
+        details,
+      };
+
+      memCache.set(cacheKey, result, 60);
+      await safeSet(cacheKey, JSON.stringify(result), "EX", 120);
+      return result;
+    } catch {
+      return { bundled: false, bundleCount: 0, bundlePercentage: 0, details: [] };
     }
   }
 }

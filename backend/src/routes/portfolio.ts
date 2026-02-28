@@ -1,6 +1,6 @@
 import { FastifyInstance } from "fastify";
 import { paginationSchema } from "../schemas/validation";
-import { getPortfolio, getTradeHistory } from "../services/portfolio";
+import { getPortfolio, getTradeHistory, getPortfolioAnalytics } from "../services/portfolio";
 
 export async function portfolioRoutes(app: FastifyInstance) {
   app.get(
@@ -25,6 +25,16 @@ export async function portfolioRoutes(app: FastifyInstance) {
       const { limit, offset } = parsed.data;
       const trades = await getTradeHistory(userId, limit, offset);
       return reply.send({ trades });
+    }
+  );
+
+  app.get(
+    "/api/portfolio/analytics",
+    { preHandler: [app.authenticate] },
+    async (request, reply) => {
+      const { userId } = request.user as { userId: string };
+      const analytics = await getPortfolioAnalytics(userId);
+      return reply.send(analytics);
     }
   );
 }

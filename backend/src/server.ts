@@ -10,6 +10,7 @@ import { authRoutes } from "./routes/auth";
 import { tradeRoutes } from "./routes/trade";
 import { portfolioRoutes } from "./routes/portfolio";
 import { marketRoutes } from "./routes/market";
+import { limitOrderRoutes } from "./routes/limit-order";
 import { setupWebSocket } from "./ws/handler";
 import { startPricePoller } from "./worker/price-poller";
 import { SolanaTrackerAdapter } from "./adapters/solana-tracker";
@@ -53,6 +54,7 @@ async function buildApp() {
   await app.register(tradeRoutes);
   await app.register(portfolioRoutes);
   await app.register(marketRoutes);
+  await app.register(limitOrderRoutes);
   await setupWebSocket(app);
 
   return app;

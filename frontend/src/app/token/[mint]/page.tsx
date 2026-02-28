@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect } from "react";
 import dynamic from "next/dynamic";
 import { useParams } from "next/navigation";
 import { useQuery, useQueryClient, keepPreviousData } from "@tanstack/react-query";
@@ -10,6 +10,9 @@ import { wsClient } from "@/lib/ws";
 import { formatPrice, formatCompact, formatNumber, shortenAddress } from "@/lib/format";
 import { OrderPanel } from "@/components/OrderPanel";
 import { Transactions } from "@/components/OrderBook";
+import { TopHolders } from "@/components/TopHolders";
+import { BundleChecker } from "@/components/BundleChecker";
+import { SocialLinks } from "@/components/SocialLinks";
 
 const Chart = dynamic(() => import("@/components/Chart").then((m) => m.Chart), {
   ssr: false,
@@ -18,13 +21,24 @@ const Chart = dynamic(() => import("@/components/Chart").then((m) => m.Chart), {
   ),
 });
 
-type ChartRange = "1d" | "7d" | "30d";
+type ChartRange = "1s" | "5s" | "15s" | "30s" | "1m" | "5m" | "15m" | "30m" | "1h" | "6h" | "1d" | "7d" | "30d";
+
+const TIMEFRAME_GROUPS: { label: string; ranges: ChartRange[] }[] = [
+  { label: "Seconds", ranges: ["1s", "5s", "15s", "30s"] },
+  { label: "Minutes", ranges: ["1m", "5m", "15m", "30m"] },
+  { label: "Hours+", ranges: ["1h", "6h", "1d", "7d", "30d"] },
+];
+
+const ALL_RANGES: ChartRange[] = ["1s", "5s", "15s", "30s", "1m", "5m", "15m", "30m", "1h", "6h", "1d", "7d", "30d"];
+
+type InfoTab = "info" | "holders" | "bundles";
 
 export default function TokenPage() {
   const params = useParams();
   const mint = params.mint as string;
   const { isAuthenticated } = useAuth();
-  const [range, setRange] = useState<ChartRange>("1d");
+  const [range, setRange] = useState<ChartRange>("5m");
+  const [infoTab, setInfoTab] = useState<InfoTab>("info");
 
   const queryClient = useQueryClient();
 
@@ -37,12 +51,16 @@ export default function TokenPage() {
     placeholderData: keepPreviousData,
   });
 
+  // Shorter refetch for sub-minute timeframes
+  const isShortRange = ["1s", "5s", "15s", "30s", "1m"].includes(range);
+  const chartRefetchInterval = isShortRange ? 3_000 : 10_000;
+
   const { data: chartData, isLoading: chartLoading } = useQuery({
     queryKey: ["chart", mint, range],
     queryFn: () => api.market.getChart(mint, range),
     enabled: !!mint,
-    refetchInterval: 10_000,
-    staleTime: 8_000,
+    refetchInterval: chartRefetchInterval,
+    staleTime: isShortRange ? 2_000 : 8_000,
     placeholderData: keepPreviousData,
   });
 
@@ -108,12 +126,12 @@ export default function TokenPage() {
         {/* Skeleton Body */}
         <div className="grid grid-cols-1 lg:grid-cols-[1fr_300px] gap-2">
           <div className="flex flex-col gap-2">
-            <div className="rounded border border-border bg-bg-primary h-[420px] animate-pulse" />
+            <div className="rounded border border-border bg-bg-primary h-[460px] animate-pulse" />
             <div className="rounded border border-border bg-bg-card h-[300px] animate-pulse" />
           </div>
           <div className="flex flex-col gap-2">
             <div className="rounded border border-border bg-bg-card h-[280px] animate-pulse" />
-            <div className="rounded border border-border bg-bg-card h-[140px] animate-pulse" />
+            <div className="rounded border border-border bg-bg-card h-[200px] animate-pulse" />
           </div>
         </div>
       </div>
@@ -125,7 +143,7 @@ export default function TokenPage() {
   return (
     <div className="pt-2 pb-6">
       {/* Token Header Bar */}
-      <div className="flex items-center gap-3 mb-2 pb-2 border-b border-border">
+      <div className="flex flex-wrap items-center gap-3 mb-2 pb-2 border-b border-border">
         {/* Token identity */}
         <div className="flex items-center gap-2">
           {t.image ? (
@@ -150,12 +168,15 @@ export default function TokenPage() {
           </div>
         </div>
 
-        {/* Stats bar */}
+        {/* Social Links */}
+        <SocialLinks socials={t.socials} mint={mint} />
+
+        {/* Stats bar — MCap highlighted */}
         <div className="flex items-center gap-4 ml-auto">
-          <StatItem label="Price" value={formatPrice(t.price)} highlight />
+          <StatItem label="MCap" value={formatCompact(t.marketCap)} highlight />
+          <StatItem label="Price" value={formatPrice(t.price)} />
           <StatItem label="Liq" value={formatCompact(t.liquidity)} />
           <StatItem label="24h Vol" value={formatCompact(t.volume24h || 0)} />
-          <StatItem label="MCap" value={formatCompact(t.marketCap)} />
           <StatItem label="Supply" value={formatNumber(t.supply, 0)} />
         </div>
       </div>
@@ -166,13 +187,13 @@ export default function TokenPage() {
         <div className="flex flex-col gap-2">
           {/* Chart */}
           <div className="rounded border border-border bg-bg-primary overflow-hidden">
-            {/* Timeframe bar */}
-            <div className="flex items-center gap-1 px-3 py-1.5 border-b border-border bg-bg-secondary">
-              {(["1d", "7d", "30d"] as ChartRange[]).map((r) => (
+            {/* Timeframe bar — all granular options */}
+            <div className="flex items-center gap-0.5 px-2 py-1.5 border-b border-border bg-bg-secondary overflow-x-auto scrollbar-thin">
+              {ALL_RANGES.map((r) => (
                 <button
                   key={r}
                   onClick={() => setRange(r)}
-                  className={`px-2.5 py-1 rounded text-[10px] font-bold transition-colors ${
+                  className={`px-2 py-1 rounded text-[10px] font-bold transition-colors whitespace-nowrap ${
                     range === r
                       ? "bg-accent-green/20 text-accent-green"
                       : "text-text-muted hover:text-text-primary hover:bg-bg-tertiary"
@@ -182,9 +203,10 @@ export default function TokenPage() {
                   {r.toUpperCase()}
                 </button>
               ))}
-              <div className="ml-auto flex items-center gap-2 text-[10px] text-text-muted">
-                <span>Price / MC</span>
-                <span>USD / SOL</span>
+              <div className="ml-auto flex items-center gap-2 text-[10px] text-text-muted flex-shrink-0 pl-2">
+                {isShortRange && (
+                  <span className="text-accent-green animate-pulse font-medium">LIVE</span>
+                )}
               </div>
             </div>
             {chartLoading && chartBars.length === 0 ? (
@@ -208,31 +230,76 @@ export default function TokenPage() {
           <Transactions mint={mint} />
         </div>
 
-        {/* Right: Order Panel + Token Details */}
+        {/* Right: Order Panel + Tabbed Info */}
         <div className="flex flex-col gap-2">
           <OrderPanel token={t} usdcBalance={usdcBalance} tokenQty={tokenQty} />
 
-          {/* Token Details card */}
-          <div className="rounded border border-border bg-bg-card p-3">
-            <h3 className="text-[10px] font-semibold text-text-muted uppercase tracking-wider mb-2">Token Info</h3>
-            <div className="grid grid-cols-2 gap-2 text-[10px]">
-              <div>
-                <span className="text-text-muted">Mint</span>
-                <div className="font-mono text-text-secondary truncate" title={t.mint}>{shortenAddress(t.mint, 6)}</div>
-              </div>
-              <div>
-                <span className="text-text-muted">Decimals</span>
-                <div className="text-text-secondary">{t.decimals}</div>
-              </div>
-              <div>
-                <span className="text-text-muted">Supply</span>
-                <div className="text-text-secondary">{formatNumber(t.supply, 0)}</div>
-              </div>
-              <div>
-                <span className="text-text-muted">Liquidity</span>
-                <div className="text-text-secondary">{formatCompact(t.liquidity)}</div>
-              </div>
+          {/* Tabbed info section: Token Info / Holders / Bundles */}
+          <div className="rounded border border-border bg-bg-card overflow-hidden">
+            <div className="flex border-b border-border bg-bg-secondary">
+              {(["info", "holders", "bundles"] as InfoTab[]).map((tab) => (
+                <button
+                  key={tab}
+                  onClick={() => setInfoTab(tab)}
+                  className={`flex-1 py-1.5 text-[10px] font-semibold uppercase tracking-wider transition-colors ${
+                    infoTab === tab
+                      ? "text-accent-green border-b-2 border-accent-green bg-bg-card"
+                      : "text-text-muted hover:text-text-secondary"
+                  }`}
+                >
+                  {tab === "info" ? "Info" : tab === "holders" ? "Holders" : "Bundles"}
+                </button>
+              ))}
             </div>
+
+            {infoTab === "info" && (
+              <div className="p-3">
+                <div className="grid grid-cols-2 gap-2 text-[10px]">
+                  <div>
+                    <span className="text-text-muted">Mint</span>
+                    <div className="font-mono text-text-secondary truncate" title={t.mint}>{shortenAddress(t.mint, 6)}</div>
+                  </div>
+                  <div>
+                    <span className="text-text-muted">Decimals</span>
+                    <div className="text-text-secondary">{t.decimals}</div>
+                  </div>
+                  <div>
+                    <span className="text-text-muted">Supply</span>
+                    <div className="text-text-secondary">{formatNumber(t.supply, 0)}</div>
+                  </div>
+                  <div>
+                    <span className="text-text-muted">Liquidity</span>
+                    <div className="text-text-secondary">{formatCompact(t.liquidity)}</div>
+                  </div>
+                  <div>
+                    <span className="text-text-muted">Market Cap</span>
+                    <div className="text-accent-green font-semibold">{formatCompact(t.marketCap)}</div>
+                  </div>
+                  <div>
+                    <span className="text-text-muted">24h Volume</span>
+                    <div className="text-text-secondary">{formatCompact(t.volume24h || 0)}</div>
+                  </div>
+                </div>
+
+                {/* Social links in info tab */}
+                {t.socials && Object.keys(t.socials).length > 0 && (
+                  <div className="mt-3 pt-2 border-t border-border/50">
+                    <span className="text-[9px] text-text-muted uppercase tracking-wider">Socials</span>
+                    <div className="mt-1">
+                      <SocialLinks socials={t.socials} mint={mint} />
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {infoTab === "holders" && (
+              <TopHolders mint={mint} />
+            )}
+
+            {infoTab === "bundles" && (
+              <BundleChecker mint={mint} />
+            )}
           </div>
         </div>
       </div>
