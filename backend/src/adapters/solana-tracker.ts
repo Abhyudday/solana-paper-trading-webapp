@@ -176,8 +176,9 @@ export class SolanaTrackerAdapter implements MarketDataAdapter {
     const from = now - rangeToSeconds(range);
     const interval = rangeToInterval(range);
     // Shorter cache for sub-minute timeframes
-    const isShortRange = ["1s", "5s", "15s", "30s", "1m"].includes(range);
-    const chartCacheTtl = isShortRange ? 5 : CACHE_TTL_CHART;
+    const isUltraShort = ["1s", "5s"].includes(range);
+    const isShortRange = ["15s", "30s", "1m"].includes(range);
+    const chartCacheTtl = isUltraShort ? 2 : isShortRange ? 5 : CACHE_TTL_CHART;
 
     try {
       const data = await fetchApi<{
@@ -205,7 +206,7 @@ export class SolanaTrackerAdapter implements MarketDataAdapter {
         volume: b.volume || 0,
       }));
 
-      memCache.set(cacheKey, bars, isShortRange ? 3 : 15);
+      memCache.set(cacheKey, bars, isUltraShort ? 1 : isShortRange ? 3 : 15);
       await safeSet(cacheKey, JSON.stringify(bars), "EX", chartCacheTtl);
       return bars;
     } catch {

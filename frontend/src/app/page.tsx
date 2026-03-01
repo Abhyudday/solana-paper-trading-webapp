@@ -291,14 +291,13 @@ function TokenColumn({
   );
 }
 
-type ColumnId = "new" | "migrating" | "migrated" | "trending";
+type ColumnId = "new" | "migrating" | "migrated";
 
 export default function LandingPage() {
   const [columnFilters, setColumnFilters] = useState<Record<ColumnId, TokenFilterParams>>({
     new: {},
     migrating: {},
     migrated: {},
-    trending: {},
   });
   const [filterOpen, setFilterOpen] = useState<ColumnId | null>(null);
 
@@ -306,7 +305,6 @@ export default function LandingPage() {
   const lastLatestRef = useRef<TokenInfo[]>([]);
   const lastGraduatingRef = useRef<TokenInfo[]>([]);
   const lastGraduatedRef = useRef<TokenInfo[]>([]);
-  const lastTrendingRef = useRef<TokenInfo[]>([]);
 
   // Default (unfiltered) queries
   const { data: latestData, isLoading: latestLoading } = useQuery({
@@ -336,28 +334,16 @@ export default function LandingPage() {
     placeholderData: keepPreviousData,
   });
 
-  const { data: trendingData, isLoading: trendingLoading } = useQuery({
-    queryKey: ["trendingTokens"],
-    queryFn: () => api.market.getTrendingTokens(),
-    refetchInterval: 5_000,
-    staleTime: 3_000,
-    refetchOnWindowFocus: false,
-    placeholderData: keepPreviousData,
-  });
-
   // Stabilize token arrays: never pass [] if we had data before
   const rawLatest = latestData?.tokens || [];
   const rawGraduating = graduatingData?.tokens || [];
   const rawGraduated = graduatedData?.tokens || [];
-  const rawTrending = trendingData?.tokens || [];
   if (rawLatest.length > 0) lastLatestRef.current = rawLatest;
   if (rawGraduating.length > 0) lastGraduatingRef.current = rawGraduating;
   if (rawGraduated.length > 0) lastGraduatedRef.current = rawGraduated;
-  if (rawTrending.length > 0) lastTrendingRef.current = rawTrending;
   const stableLatest = rawLatest.length > 0 ? rawLatest : lastLatestRef.current;
   const stableGraduating = rawGraduating.length > 0 ? rawGraduating : lastGraduatingRef.current;
   const stableGraduated = rawGraduated.length > 0 ? rawGraduated : lastGraduatedRef.current;
-  const stableTrending = rawTrending.length > 0 ? rawTrending : lastTrendingRef.current;
 
   // Filtered queries — only enabled when filters are active
   const newHasFilters = countActiveFilters(columnFilters.new) > 0;
@@ -401,8 +387,8 @@ export default function LandingPage() {
 
   return (
     <div className="pt-2 pb-4">
-      {/* 4-column trenches grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      {/* 3-column trenches grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         <TokenColumn
           title="New Pairs"
           defaultTokens={stableLatest}
@@ -435,17 +421,6 @@ export default function LandingPage() {
           color="bg-accent-blue"
           filters={columnFilters.migrated}
           onOpenFilter={() => setFilterOpen("migrated")}
-        />
-        <TokenColumn
-          title="Trending"
-          defaultTokens={stableTrending}
-          filteredTokens={undefined}
-          isLoading={trendingLoading}
-          isFilterLoading={false}
-          hasData={!!trendingData}
-          color="bg-accent-orange"
-          filters={columnFilters.trending}
-          onOpenFilter={() => setFilterOpen("trending")}
         />
       </div>
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import dynamic from "next/dynamic";
 import { useParams } from "next/navigation";
 import { useQuery, useQueryClient, keepPreviousData } from "@tanstack/react-query";
@@ -51,9 +51,20 @@ export default function TokenPage() {
     placeholderData: keepPreviousData,
   });
 
-  // Shorter refetch for sub-minute timeframes
+  // Dynamic refetch intervals per timeframe
   const isShortRange = ["1s", "5s", "15s", "30s", "1m"].includes(range);
-  const chartRefetchInterval = isShortRange ? 3_000 : 10_000;
+  const chartRefetchInterval = (() => {
+    switch (range) {
+      case "1s": return 1_000;
+      case "5s": return 2_000;
+      case "15s": return 3_000;
+      case "30s": return 3_000;
+      case "1m": return 5_000;
+      case "5m": return 10_000;
+      case "15m": return 15_000;
+      default: return 30_000;
+    }
+  })();
 
   const { data: chartData, isLoading: chartLoading } = useQuery({
     queryKey: ["chart", mint, range],
@@ -63,6 +74,16 @@ export default function TokenPage() {
     staleTime: isShortRange ? 2_000 : 8_000,
     placeholderData: keepPreviousData,
   });
+
+  // Track last chart update time for LIVE indicator
+  const lastUpdateRef = useRef<number>(Date.now());
+  const [lastUpdated, setLastUpdated] = useState<number>(Date.now());
+  useEffect(() => {
+    if (chartData) {
+      lastUpdateRef.current = Date.now();
+      setLastUpdated(Date.now());
+    }
+  }, [chartData]);
 
   const { data: portfolio } = useQuery({
     queryKey: ["portfolio"],
@@ -205,7 +226,16 @@ export default function TokenPage() {
               ))}
               <div className="ml-auto flex items-center gap-2 text-[10px] text-text-muted flex-shrink-0 pl-2">
                 {isShortRange && (
-                  <span className="text-accent-green animate-pulse font-medium">LIVE</span>
+                  <span className="flex items-center gap-1.5 font-medium">
+                    <span className="relative flex h-2 w-2">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-accent-green opacity-75" />
+                      <span className="relative inline-flex rounded-full h-2 w-2 bg-accent-green" />
+                    </span>
+                    <span className="text-accent-green">LIVE</span>
+                    <span className="text-text-muted/60 text-[9px] font-mono">
+                      {new Date(lastUpdated).toLocaleTimeString()}
+                    </span>
+                  </span>
                 )}
               </div>
             </div>
