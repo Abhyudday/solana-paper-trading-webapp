@@ -128,9 +128,9 @@ export function OrderPanel({ token, usdcBalance, tokenQty }: OrderPanelProps) {
       <div className="flex gap-0.5 mb-2">
         <button
           onClick={() => setSide("buy")}
-          className={`flex-1 py-1.5 rounded text-xs font-bold transition-colors ${
+          className={`flex-1 py-1.5 rounded text-xs font-bold transition-all duration-200 ${
             side === "buy"
-              ? "bg-accent-green text-black"
+              ? "bg-accent-green text-black shadow-[0_0_12px_rgba(0,200,83,0.2)]"
               : "bg-bg-tertiary text-text-muted hover:text-text-secondary"
           }`}
           aria-pressed={side === "buy"}
@@ -139,9 +139,9 @@ export function OrderPanel({ token, usdcBalance, tokenQty }: OrderPanelProps) {
         </button>
         <button
           onClick={() => setSide("sell")}
-          className={`flex-1 py-1.5 rounded text-xs font-bold transition-colors ${
+          className={`flex-1 py-1.5 rounded text-xs font-bold transition-all duration-200 ${
             side === "sell"
-              ? "bg-accent-red text-white"
+              ? "bg-accent-red text-white shadow-[0_0_12px_rgba(255,59,59,0.2)]"
               : "bg-bg-tertiary text-text-muted hover:text-text-secondary"
           }`}
           aria-pressed={side === "sell"}
@@ -325,10 +325,10 @@ export function OrderPanel({ token, usdcBalance, tokenQty }: OrderPanelProps) {
         <button
           type="submit"
           disabled={!isAuthenticated || isPending}
-          className={`w-full py-2 rounded text-xs font-bold transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${
+          className={`w-full py-2.5 rounded text-xs font-bold transition-all duration-200 disabled:opacity-40 disabled:cursor-not-allowed ${
             side === "buy"
-              ? "bg-accent-green text-black hover:bg-accent-green/90"
-              : "bg-accent-red text-white hover:bg-accent-red/90"
+              ? "bg-accent-green text-black hover:bg-accent-green/90 hover:shadow-[0_0_16px_rgba(0,200,83,0.25)]"
+              : "bg-accent-red text-white hover:bg-accent-red/90 hover:shadow-[0_0_16px_rgba(255,59,59,0.25)]"
           }`}
         >
           {isPending

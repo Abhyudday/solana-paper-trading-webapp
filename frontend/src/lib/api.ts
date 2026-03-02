@@ -151,6 +151,7 @@ export const api = {
     getTokenTrades: (mint: string) => request<{ trades: TokenTrade[] }>(`/api/market/tokens/${mint}/trades`),
     getTokenHolders: (mint: string) => request<TokenHolderInfo>(`/api/market/tokens/${mint}/holders`),
     getTokenBundles: (mint: string) => request<BundleInfo>(`/api/market/tokens/${mint}/bundles`),
+    getTokenSnipers: (mint: string) => request<SniperInfo>(`/api/market/tokens/${mint}/snipers`),
     getGraduatingTokens: () => request<{ tokens: TokenInfo[] }>("/api/market/graduating"),
     getGraduatedTokens: () => request<{ tokens: TokenInfo[] }>("/api/market/graduated"),
     getFilteredTokens: (filters: TokenFilterParams) => {
@@ -217,11 +218,17 @@ export interface TokenInfo {
   socials?: TokenSocials;
 }
 
+export type WalletType = "whale" | "sniper" | "team" | "dex" | "cex" | "contract" | "unknown";
+
 export interface TokenHolder {
   address: string;
   amount: number;
   percentage: number;
   isInsider?: boolean;
+  walletType?: WalletType;
+  label?: string;
+  firstBuyTime?: number;
+  holdingSince?: number;
 }
 
 export interface TokenHolderInfo {
@@ -242,7 +249,27 @@ export interface BundleInfo {
   bundled: boolean;
   bundleCount: number;
   bundlePercentage: number;
+  riskScore: number;
+  riskLevel: "low" | "medium" | "high" | "critical";
   details: BundleDetail[];
+  sniperInfo?: SniperInfo;
+}
+
+export interface SniperWallet {
+  address: string;
+  buyTime: number;
+  blockOffset: number;
+  amountUsd: number;
+  percentage: number;
+  currentPnl?: number;
+  tx: string;
+}
+
+export interface SniperInfo {
+  hasSnipers: boolean;
+  sniperCount: number;
+  sniperPercentage: number;
+  snipers: SniperWallet[];
 }
 
 export interface OHLCVBar {

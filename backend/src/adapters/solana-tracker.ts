@@ -13,7 +13,40 @@ import type {
   TokenHolderInfo,
   TokenHolder,
   BundleInfo,
+  BundleDetail,
+  SniperInfo,
+  SniperWallet,
+  WalletType,
 } from "./market-data";
+
+// Known wallet labels (DEXes, CEXes, contracts)
+const KNOWN_WALLETS: Record<string, { type: WalletType; label: string }> = {
+  "5Q544fKrFoe6tsEbD7S8EmxGTJYAKtTVhAW5Q5pge4j1": { type: "dex", label: "Raydium Authority" },
+  "675kPX9MHTjS2zt1qfr1NYHuzeLXfQM9H24wFSUt1Mp8": { type: "dex", label: "Raydium AMM" },
+  "JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4": { type: "dex", label: "Jupiter v6" },
+  "whirLbMiicVdio4qvUfM5KAg6Ct8VwpYzGff3uctyCc": { type: "dex", label: "Orca Whirlpool" },
+  "TSWAPaqyCSx2KABk68Shruf4rp7CxcNi8hAsbdwmHbN": { type: "dex", label: "Tensor Swap" },
+  "GDDMwNyyx8uB6zrqwBFHjLLG3TBYk2F8Az4yrQC5RzMp": { type: "cex", label: "Coinbase" },
+};
+
+function classifyWallet(address: string, percentage: number, isInsider?: boolean): { type: WalletType; label?: string } {
+  const known = KNOWN_WALLETS[address];
+  if (known) return known;
+  if (isInsider) return { type: "team", label: "Insider" };
+  if (percentage >= 5) return { type: "whale" };
+  return { type: "unknown" };
+}
+
+function calculateRiskScore(bundled: boolean, bundlePercentage: number, bundleCount: number, sniperPercentage: number): { score: number; level: "low" | "medium" | "high" | "critical" } {
+  let score = 0;
+  if (bundled) score += 20;
+  score += Math.min(bundlePercentage * 1.5, 40);
+  score += Math.min(bundleCount * 3, 15);
+  score += Math.min(sniperPercentage * 2, 25);
+  score = Math.min(Math.round(score), 100);
+  const level = score >= 75 ? "critical" : score >= 50 ? "high" : score >= 25 ? "medium" : "low";
+  return { score, level };
+}
 
 const CACHE_TTL_PRICE = 15; // seconds
 const CACHE_TTL_INFO = 300;
@@ -175,10 +208,10 @@ export class SolanaTrackerAdapter implements MarketDataAdapter {
     const now = Math.floor(Date.now() / 1000);
     const from = now - rangeToSeconds(range);
     const interval = rangeToInterval(range);
-    // Shorter cache for sub-minute timeframes
-    const isUltraShort = ["1s", "5s"].includes(range);
-    const isShortRange = ["15s", "30s", "1m"].includes(range);
-    const chartCacheTtl = isUltraShort ? 2 : isShortRange ? 5 : CACHE_TTL_CHART;
+    // Shorter cache for sub-minute timeframes — 15s is default so optimize it
+    const isUltraShort = ["1s", "5s", "15s"].includes(range);
+    const isShortRange = ["30s", "1m"].includes(range);
+    const chartCacheTtl = isUltraShort ? 3 : isShortRange ? 5 : CACHE_TTL_CHART;
 
     try {
       const data = await fetchApi<{
@@ -730,12 +763,19 @@ export class SolanaTrackerAdapter implements MarketDataAdapter {
       const accounts = data.accounts || [];
       const topHolders: TokenHolder[] = accounts
         .slice(0, 20)
-        .map((a) => ({
-          address: a.owner || "",
-          amount: a.balance || 0,
-          percentage: a.percentage || 0,
-          isInsider: a.insider,
-        }));
+        .map((a) => {
+          const addr = a.owner || "";
+          const pct = a.percentage || 0;
+          const classification = classifyWallet(addr, pct, a.insider);
+          return {
+            address: addr,
+            amount: a.balance || 0,
+            percentage: pct,
+            isInsider: a.insider,
+            walletType: classification.type,
+            label: classification.label,
+          };
+        });
 
       const top10Pct = topHolders.slice(0, 10).reduce((sum, h) => sum + h.percentage, 0);
       const top20Pct = topHolders.reduce((sum, h) => sum + h.percentage, 0);
@@ -778,25 +818,149 @@ export class SolanaTrackerAdapter implements MarketDataAdapter {
         }>;
       }>(`tokens/${mint}/bundles`);
 
-      const details = (data.bundles || []).map((b) => ({
+      const details: BundleDetail[] = (data.bundles || []).map((b) => ({
         wallet: b.wallet || "",
         amount: b.amount || 0,
         percentage: b.percentage || 0,
         tx: b.tx || "",
       }));
 
+      const bundled = data.bundled || details.length > 0;
+      const bundlePercentage = details.reduce((sum, d) => sum + d.percentage, 0);
+
+      // Fetch sniper info to include in bundle analysis
+      let sniperInfo: SniperInfo | undefined;
+      try {
+        sniperInfo = await this.getTokenSnipers(mint);
+      } catch {
+        // sniper info is optional
+      }
+
+      const sniperPct = sniperInfo?.sniperPercentage || 0;
+      const { score, level } = calculateRiskScore(bundled, bundlePercentage, details.length, sniperPct);
+
       const result: BundleInfo = {
-        bundled: data.bundled || details.length > 0,
+        bundled,
         bundleCount: details.length,
-        bundlePercentage: details.reduce((sum, d) => sum + d.percentage, 0),
+        bundlePercentage,
+        riskScore: score,
+        riskLevel: level,
         details,
+        sniperInfo,
       };
 
       memCache.set(cacheKey, result, 60);
       await safeSet(cacheKey, JSON.stringify(result), "EX", 120);
       return result;
     } catch {
-      return { bundled: false, bundleCount: 0, bundlePercentage: 0, details: [] };
+      return { bundled: false, bundleCount: 0, bundlePercentage: 0, riskScore: 0, riskLevel: "low", details: [] };
+    }
+  }
+
+  async getTokenSnipers(mint: string): Promise<SniperInfo> {
+    const cacheKey = `snipers:${mint}`;
+    const memHit = memCache.get<SniperInfo>(cacheKey);
+    if (memHit) return memHit;
+
+    const cached = await safeGet(cacheKey);
+    if (cached) {
+      const parsed = JSON.parse(cached) as SniperInfo;
+      memCache.set(cacheKey, parsed, 60);
+      return parsed;
+    }
+
+    try {
+      // Use early trades data to detect snipers
+      // Snipers are wallets that bought in the first few seconds/blocks
+      const tradesData = await fetchApi<{
+        trades?: Array<{
+          tx?: string;
+          type?: string;
+          amount?: number;
+          volume?: number;
+          volumeSol?: number;
+          priceUsd?: number;
+          wallet?: string;
+          time?: number;
+        }>;
+      }>(`trades/${mint}`);
+
+      const allTrades = tradesData.trades || [];
+      const buyTrades = allTrades.filter((t) => t.type === "buy" && t.time && t.time > 0);
+
+      if (buyTrades.length === 0) {
+        const empty: SniperInfo = { hasSnipers: false, sniperCount: 0, sniperPercentage: 0, snipers: [] };
+        memCache.set(cacheKey, empty, 60);
+        await safeSet(cacheKey, JSON.stringify(empty), "EX", 120);
+        return empty;
+      }
+
+      // Sort by time, find earliest trade
+      buyTrades.sort((a, b) => (a.time || 0) - (b.time || 0));
+      const earliestTime = buyTrades[0].time || 0;
+
+      // Snipers = wallets that bought within first 60 seconds
+      const SNIPER_WINDOW_SECONDS = 60;
+      const sniperTrades = buyTrades.filter(
+        (t) => (t.time || 0) - earliestTime <= SNIPER_WINDOW_SECONDS
+      );
+
+      // Aggregate by wallet
+      const walletMap = new Map<string, { totalUsd: number; firstTime: number; tx: string }>();
+      for (const t of sniperTrades) {
+        const w = t.wallet || "";
+        if (!w) continue;
+        const existing = walletMap.get(w);
+        if (existing) {
+          existing.totalUsd += t.volume || 0;
+        } else {
+          walletMap.set(w, {
+            totalUsd: t.volume || 0,
+            firstTime: t.time || 0,
+            tx: t.tx || "",
+          });
+        }
+      }
+
+      // Get holder data to estimate percentage
+      let holderMap = new Map<string, number>();
+      try {
+        const holders = await this.getTokenHolders(mint);
+        for (const h of holders.topHolders) {
+          holderMap.set(h.address, h.percentage);
+        }
+      } catch {}
+
+      const snipers: SniperWallet[] = [];
+      let totalSniperPct = 0;
+      for (const [addr, data] of walletMap.entries()) {
+        const pct = holderMap.get(addr) || 0;
+        totalSniperPct += pct;
+        snipers.push({
+          address: addr,
+          buyTime: data.firstTime,
+          blockOffset: Math.round((data.firstTime - earliestTime)),
+          amountUsd: data.totalUsd,
+          percentage: pct,
+          tx: data.tx,
+        });
+      }
+
+      // Sort by amount descending
+      snipers.sort((a, b) => b.amountUsd - a.amountUsd);
+
+      const result: SniperInfo = {
+        hasSnipers: snipers.length > 0,
+        sniperCount: snipers.length,
+        sniperPercentage: totalSniperPct,
+        snipers: snipers.slice(0, 20),
+      };
+
+      memCache.set(cacheKey, result, 60);
+      await safeSet(cacheKey, JSON.stringify(result), "EX", 120);
+      return result;
+    } catch {
+      return { hasSnipers: false, sniperCount: 0, sniperPercentage: 0, snipers: [] };
     }
   }
 }

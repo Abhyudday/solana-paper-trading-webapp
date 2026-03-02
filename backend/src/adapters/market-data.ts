@@ -28,11 +28,17 @@ export interface TokenInfo {
   socials?: TokenSocials;
 }
 
+export type WalletType = "whale" | "sniper" | "team" | "dex" | "cex" | "contract" | "unknown";
+
 export interface TokenHolder {
   address: string;
   amount: number;
   percentage: number;
   isInsider?: boolean;
+  walletType?: WalletType;
+  label?: string;
+  firstBuyTime?: number;
+  holdingSince?: number;
 }
 
 export interface TokenHolderInfo {
@@ -42,16 +48,38 @@ export interface TokenHolderInfo {
   top20Pct: number;
 }
 
+export interface BundleDetail {
+  wallet: string;
+  amount: number;
+  percentage: number;
+  tx: string;
+}
+
 export interface BundleInfo {
   bundled: boolean;
   bundleCount: number;
   bundlePercentage: number;
-  details: Array<{
-    wallet: string;
-    amount: number;
-    percentage: number;
-    tx: string;
-  }>;
+  riskScore: number;
+  riskLevel: "low" | "medium" | "high" | "critical";
+  details: BundleDetail[];
+  sniperInfo?: SniperInfo;
+}
+
+export interface SniperWallet {
+  address: string;
+  buyTime: number;
+  blockOffset: number;
+  amountUsd: number;
+  percentage: number;
+  currentPnl?: number;
+  tx: string;
+}
+
+export interface SniperInfo {
+  hasSnipers: boolean;
+  sniperCount: number;
+  sniperPercentage: number;
+  snipers: SniperWallet[];
 }
 
 export interface OHLCVBar {
@@ -135,4 +163,5 @@ export interface MarketDataAdapter {
   getFilteredTokens(filters: TokenFilterParams): Promise<FilteredTokenItem[]>;
   getTokenHolders(mint: string): Promise<TokenHolderInfo>;
   getTokenBundles(mint: string): Promise<BundleInfo>;
+  getTokenSnipers(mint: string): Promise<SniperInfo>;
 }

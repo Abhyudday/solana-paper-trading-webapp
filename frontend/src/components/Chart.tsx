@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useRef, useState, useCallback, useMemo, memo } from "react";
 import { createChart, IChartApi, ISeriesApi, CandlestickData, HistogramData, LineData, Time, SeriesType } from "lightweight-charts";
 import { OHLCVBar } from "@/lib/api";
 
@@ -144,7 +144,7 @@ function dedupAndSort(data: OHLCVBar[]) {
     });
 }
 
-export function Chart({ data, height = 400 }: ChartProps) {
+export const Chart = memo(function Chart({ data, height = 400 }: ChartProps) {
   const priceContainerRef = useRef<HTMLDivElement>(null);
   const volumeContainerRef = useRef<HTMLDivElement>(null);
   const rsiContainerRef = useRef<HTMLDivElement>(null);
@@ -493,7 +493,7 @@ export function Chart({ data, height = 400 }: ChartProps) {
     };
   }, [data, height, volumeHeight, oscillatorHeight, activeIndicators, hasRSI, hasMACD]);
 
-  const filtered = dedupAndSort(data);
+  const filtered = useMemo(() => dedupAndSort(data), [data]);
   if (filtered.length === 0 && !chartError) {
     return (
       <div className="w-full rounded-lg overflow-hidden bg-[#0b0e11] flex items-center justify-center" style={{ height: height + volumeHeight + 28 }}>
@@ -521,7 +521,7 @@ export function Chart({ data, height = 400 }: ChartProps) {
   }
 
   return (
-    <div className="w-full rounded-lg overflow-hidden" role="img" aria-label="Token price chart">
+    <div className="w-full rounded-lg overflow-hidden chart-fade-in" role="img" aria-label="Token price chart">
       {/* Indicator toolbar */}
       <div className="flex items-center gap-1 px-2 py-1 bg-[#0b0e11] border-b border-[#1e2128]/50">
         <button
@@ -623,4 +623,4 @@ export function Chart({ data, height = 400 }: ChartProps) {
       )}
     </div>
   );
-}
+});

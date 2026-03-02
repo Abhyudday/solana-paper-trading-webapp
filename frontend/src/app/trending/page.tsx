@@ -44,9 +44,9 @@ function TrendingTokenRow({ token, rank }: { token: TokenInfo; rank: number }) {
       staleTime: 30000,
     });
     queryClient.prefetchQuery({
-      queryKey: ["chart", token.mint, "5m"],
-      queryFn: () => api.market.getChart(token.mint, "5m"),
-      staleTime: 30000,
+      queryKey: ["chart", token.mint, "15s"],
+      queryFn: () => api.market.getChart(token.mint, "15s"),
+      staleTime: 5000,
     });
   }, [queryClient, token.mint]);
 

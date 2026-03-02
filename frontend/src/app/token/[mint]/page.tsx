@@ -37,7 +37,7 @@ export default function TokenPage() {
   const params = useParams();
   const mint = params.mint as string;
   const { isAuthenticated } = useAuth();
-  const [range, setRange] = useState<ChartRange>("5m");
+  const [range, setRange] = useState<ChartRange>("15s");
   const [infoTab, setInfoTab] = useState<InfoTab>("info");
 
   const queryClient = useQueryClient();
@@ -93,7 +93,7 @@ export default function TokenPage() {
     staleTime: 10_000,
   });
 
-  // Prefetch trades so they load in parallel with token info
+  // Prefetch trades, holders, bundles in parallel with token info
   useEffect(() => {
     if (mint) {
       queryClient.prefetchQuery({
@@ -101,10 +101,34 @@ export default function TokenPage() {
         queryFn: () => api.market.getTokenTrades(mint),
         staleTime: 3_000,
       });
+      queryClient.prefetchQuery({
+        queryKey: ["tokenHolders", mint],
+        queryFn: () => api.market.getTokenHolders(mint),
+        staleTime: 30_000,
+      });
+      queryClient.prefetchQuery({
+        queryKey: ["tokenBundles", mint],
+        queryFn: () => api.market.getTokenBundles(mint),
+        staleTime: 60_000,
+      });
       wsClient.subscribe(mint);
       return () => wsClient.unsubscribe(mint);
     }
   }, [mint, queryClient]);
+
+  // Prefetch adjacent timeframes for instant switching
+  useEffect(() => {
+    if (!mint) return;
+    const idx = ALL_RANGES.indexOf(range);
+    const adjacentRanges = [ALL_RANGES[idx - 1], ALL_RANGES[idx + 1]].filter(Boolean);
+    adjacentRanges.forEach((r) => {
+      queryClient.prefetchQuery({
+        queryKey: ["chart", mint, r],
+        queryFn: () => api.market.getChart(mint, r!),
+        staleTime: 5_000,
+      });
+    });
+  }, [mint, range, queryClient]);
 
   const usdcBalance = portfolio?.usdcBalance ?? 0;
   const position = portfolio?.positions.find((p) => p.mint === mint);
@@ -271,13 +295,13 @@ export default function TokenPage() {
                 <button
                   key={tab}
                   onClick={() => setInfoTab(tab)}
-                  className={`flex-1 py-1.5 text-[10px] font-semibold uppercase tracking-wider transition-colors ${
+                  className={`flex-1 py-1.5 text-[10px] font-semibold uppercase tracking-wider transition-colors relative ${
                     infoTab === tab
                       ? "text-accent-green border-b-2 border-accent-green bg-bg-card"
                       : "text-text-muted hover:text-text-secondary"
                   }`}
                 >
-                  {tab === "info" ? "Info" : tab === "holders" ? "Holders" : "Bundles"}
+                  {tab === "info" ? "Info" : tab === "holders" ? "Holders" : "Bundles & Snipers"}
                 </button>
               ))}
             </div>

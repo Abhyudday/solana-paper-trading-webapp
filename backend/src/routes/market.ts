@@ -33,7 +33,11 @@ export async function marketRoutes(app: FastifyInstance) {
       return reply.status(400).send({ error: parsed.error.flatten() });
     }
     const bars = await adapter.getOHLCV(mint, parsed.data.range);
-    reply.header("Cache-Control", "public, max-age=10, stale-while-revalidate=20");
+    const isSubMinute = ["1s", "5s", "15s", "30s"].includes(parsed.data.range);
+    reply.header("Cache-Control", isSubMinute
+      ? "public, max-age=2, stale-while-revalidate=5"
+      : "public, max-age=10, stale-while-revalidate=20"
+    );
     return reply.send({ bars });
   });
 
@@ -91,6 +95,13 @@ export async function marketRoutes(app: FastifyInstance) {
     const bundles = await adapter.getTokenBundles(mint);
     reply.header("Cache-Control", "public, max-age=60, stale-while-revalidate=120");
     return reply.send(bundles);
+  });
+
+  app.get("/api/market/tokens/:mint/snipers", async (request, reply) => {
+    const { mint } = request.params as { mint: string };
+    const snipers = await adapter.getTokenSnipers(mint);
+    reply.header("Cache-Control", "public, max-age=60, stale-while-revalidate=120");
+    return reply.send(snipers);
   });
 
   app.get("/api/market/graduating", async (_request, reply) => {

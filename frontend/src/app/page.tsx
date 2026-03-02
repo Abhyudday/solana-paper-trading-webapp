@@ -61,9 +61,9 @@ function TokenCard({ token, isNew }: { token: DisplayToken; isNew?: boolean }) {
       staleTime: 30000,
     });
     queryClient.prefetchQuery({
-      queryKey: ["chart", token.mint, "1d"],
-      queryFn: () => api.market.getChart(token.mint, "1d"),
-      staleTime: 30000,
+      queryKey: ["chart", token.mint, "15s"],
+      queryFn: () => api.market.getChart(token.mint, "15s"),
+      staleTime: 5000,
     });
   }, [queryClient, token.mint]);
 
