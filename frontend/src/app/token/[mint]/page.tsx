@@ -295,7 +295,7 @@ export default function TokenPage() {
                 <span className="text-xs">Loading chart data...</span>
               </div>
             ) : chartBars.length > 0 ? (
-              <Chart data={chartBars} height={380} supply={t.supply} />
+              <Chart data={chartBars} height={380} supply={t.supply} range={range} />
             ) : (
               <div className="flex flex-col items-center justify-center h-[380px] text-text-muted bg-bg-primary gap-2">
                 <svg className="w-8 h-8 opacity-30" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>

@@ -133,6 +133,7 @@ interface ChartProps {
   data: OHLCVBar[];
   height?: number;
   supply?: number;
+  range?: string;
 }
 
 function dedupAndSort(data: OHLCVBar[]) {
@@ -147,7 +148,7 @@ function dedupAndSort(data: OHLCVBar[]) {
     });
 }
 
-export const Chart = memo(function Chart({ data, height = 400, supply }: ChartProps) {
+export const Chart = memo(function Chart({ data, height = 400, supply, range }: ChartProps) {
   const [chartMode, setChartMode] = useState<ChartMode>("price");
   const priceContainerRef = useRef<HTMLDivElement>(null);
   const volumeContainerRef = useRef<HTMLDivElement>(null);
@@ -157,6 +158,8 @@ export const Chart = memo(function Chart({ data, height = 400, supply }: ChartPr
   const volumeChartRef = useRef<IChartApi | null>(null);
   const rsiChartRef = useRef<IChartApi | null>(null);
   const macdChartRef = useRef<IChartApi | null>(null);
+  const savedLogicalRangeRef = useRef<{ from: number; to: number } | null>(null);
+  const prevRangeRef = useRef<string | undefined>(range);
   const [chartError, setChartError] = useState<string | null>(null);
   const [activeIndicators, setActiveIndicators] = useState<Set<IndicatorKey>>(new Set());
   const [showIndicatorPanel, setShowIndicatorPanel] = useState(false);
@@ -174,6 +177,14 @@ export const Chart = memo(function Chart({ data, height = 400, supply }: ChartPr
       return next;
     });
   }, []);
+
+  // Reset saved viewport when timeframe changes so chart fits new data
+  useEffect(() => {
+    if (range !== prevRangeRef.current) {
+      savedLogicalRangeRef.current = null;
+      prevRangeRef.current = range;
+    }
+  }, [range]);
 
   useEffect(() => {
     if (!priceContainerRef.current || !volumeContainerRef.current) return;
@@ -380,7 +391,6 @@ export const Chart = memo(function Chart({ data, height = 400, supply }: ChartPr
         obSeries.setData(ob70);
         osSeries.setData(os30);
 
-        rsiChart.timeScale().fitContent();
       }
 
       // --- MACD chart ---
@@ -427,22 +437,26 @@ export const Chart = memo(function Chart({ data, height = 400, supply }: ChartPr
         signalSeries.setData(signalLineData);
         histSeries.setData(histogramData);
 
-        macdChart.timeScale().fitContent();
       }
 
-      priceChart.timeScale().fitContent();
-      volChart.timeScale().fitContent();
+      // Collect all active charts
+      const allCharts = [priceChart, volChart, rsiChart, macdChart].filter(Boolean) as IChartApi[];
 
-      const MAX_BAR_SPACING = 10;
-      if (filtered.length < 60) {
-        priceChart.timeScale().applyOptions({ barSpacing: MAX_BAR_SPACING, rightOffset: 5 });
-        volChart.timeScale().applyOptions({ barSpacing: MAX_BAR_SPACING, rightOffset: 5 });
-        if (rsiChart) rsiChart.timeScale().applyOptions({ barSpacing: MAX_BAR_SPACING, rightOffset: 5 });
-        if (macdChart) macdChart.timeScale().applyOptions({ barSpacing: MAX_BAR_SPACING, rightOffset: 5 });
+      // Restore user's viewport if they've zoomed/scrolled, otherwise fit content
+      if (savedLogicalRangeRef.current) {
+        const r = savedLogicalRangeRef.current;
+        allCharts.forEach((c) => {
+          try { c.timeScale().setVisibleLogicalRange(r); } catch {}
+        });
+      } else {
+        allCharts.forEach((c) => c.timeScale().fitContent());
+        const MAX_BAR_SPACING = 10;
+        if (displayData.length < 60) {
+          allCharts.forEach((c) => c.timeScale().applyOptions({ barSpacing: MAX_BAR_SPACING, rightOffset: 5 }));
+        }
       }
 
       // Sync all chart time scales
-      const allCharts = [priceChart, volChart, rsiChart, macdChart].filter(Boolean) as IChartApi[];
       for (let i = 0; i < allCharts.length; i++) {
         for (let j = 0; j < allCharts.length; j++) {
           if (i !== j) {
@@ -456,6 +470,11 @@ export const Chart = memo(function Chart({ data, height = 400, supply }: ChartPr
           }
         }
       }
+
+      // Persist user's viewport position across data refreshes
+      priceChart.timeScale().subscribeVisibleLogicalRangeChange((logicalRange) => {
+        if (logicalRange) savedLogicalRangeRef.current = logicalRange;
+      });
 
       // Sync crosshairs between price and volume
       const pChart = priceChart;
@@ -506,7 +525,7 @@ export const Chart = memo(function Chart({ data, height = 400, supply }: ChartPr
       rsiChartRef.current = null;
       macdChartRef.current = null;
     };
-  }, [data, height, volumeHeight, oscillatorHeight, activeIndicators, hasRSI, hasMACD, chartMode, supply]);
+  }, [data, height, volumeHeight, oscillatorHeight, activeIndicators, hasRSI, hasMACD, chartMode, supply, range]);
 
   const filtered = useMemo(() => dedupAndSort(data), [data]);
   if (filtered.length === 0 && !chartError) {
