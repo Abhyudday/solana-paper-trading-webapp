@@ -50,15 +50,20 @@ export interface TokenHolderInfo {
 
 export interface BundleDetail {
   wallet: string;
-  amount: number;
+  balance: number;
   percentage: number;
-  tx: string;
+  initialBalance: number;
+  initialPercentage: number;
+  bundleTime: number;
 }
 
 export interface BundleInfo {
   bundled: boolean;
   bundleCount: number;
   bundlePercentage: number;
+  totalBalance: number;
+  initialBalance: number;
+  initialPercentage: number;
   riskScore: number;
   riskLevel: "low" | "medium" | "high" | "critical";
   details: BundleDetail[];

@@ -133,6 +133,12 @@ export function BundleChecker({ mint }: BundleCheckerProps) {
                     {(sniperInfo?.sniperPercentage || 0).toFixed(2)}%
                   </span>
                 </div>
+                {bundles.totalBalance > 0 && (
+                  <div className="flex flex-col p-2 rounded bg-bg-tertiary/30 col-span-2">
+                    <span className="text-[8px] text-text-muted uppercase">Total Bundled Balance</span>
+                    <span className="text-[11px] font-mono font-semibold text-text-primary">{formatCompact(bundles.totalBalance)}</span>
+                  </div>
+                )}
               </div>
 
               {/* Risk warning */}
@@ -158,8 +164,9 @@ export function BundleChecker({ mint }: BundleCheckerProps) {
                 <>
                   <div className="flex items-center gap-2 px-3 py-1 text-[9px] text-text-muted uppercase tracking-wide border-b border-border/40 sticky top-0 bg-bg-card z-10">
                     <span className="flex-1">Wallet</span>
-                    <span className="w-[50px] text-right">%</span>
-                    <span className="w-[60px] text-right">TX</span>
+                    <span className="w-[60px] text-right">Balance</span>
+                    <span className="w-[45px] text-right">%</span>
+                    <span className="w-[55px] text-right">Time</span>
                   </div>
                   {bundles.details.map((detail, i) => (
                     <div key={i} className="flex items-center gap-2 px-3 py-1.5 text-xs font-mono border-b border-border/40 hover:bg-bg-tertiary/40 transition-colors group">
@@ -177,17 +184,17 @@ export function BundleChecker({ mint }: BundleCheckerProps) {
                           <span className="text-[7px] px-1 py-0.5 rounded bg-accent-red/15 text-accent-red font-bold">HIGH</span>
                         )}
                       </div>
-                      <span className={`w-[50px] text-right text-[10px] font-semibold ${detail.percentage > 10 ? "text-accent-red" : "text-text-secondary"}`}>
+                      <span className="w-[60px] text-right text-[10px] text-text-secondary">
+                        {formatCompact(detail.balance)}
+                      </span>
+                      <span className={`w-[45px] text-right text-[10px] font-semibold ${detail.percentage > 10 ? "text-accent-red" : "text-text-secondary"}`}>
                         {detail.percentage.toFixed(2)}%
                       </span>
-                      <a
-                        href={`https://solscan.io/tx/${detail.tx}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="w-[60px] text-right text-[10px] text-accent-blue hover:underline transition-colors"
-                      >
-                        {shortenAddress(detail.tx, 3)}
-                      </a>
+                      <span className="w-[55px] text-right text-[9px] text-text-muted">
+                        {detail.bundleTime > 0
+                          ? new Date(detail.bundleTime > 1e12 ? detail.bundleTime : detail.bundleTime * 1000).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })
+                          : "—"}
+                      </span>
                     </div>
                   ))}
                 </>

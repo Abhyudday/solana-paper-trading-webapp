@@ -818,24 +818,33 @@ export class SolanaTrackerAdapter implements MarketDataAdapter {
 
     try {
       const data = await fetchApi<{
-        bundled?: boolean;
-        bundles?: Array<{
+        total?: number;
+        balance?: number;
+        percentage?: number;
+        initialBalance?: number;
+        initialPercentage?: number;
+        wallets?: Array<{
           wallet?: string;
-          amount?: number;
+          balance?: number;
           percentage?: number;
-          tx?: string;
+          initialBalance?: number;
+          initialPercentage?: number;
+          bundleTime?: number;
         }>;
-      }>(`tokens/${mint}/bundles`);
+      }>(`tokens/${mint}/bundlers`);
 
-      const details: BundleDetail[] = (data.bundles || []).map((b) => ({
-        wallet: b.wallet || "",
-        amount: b.amount || 0,
-        percentage: b.percentage || 0,
-        tx: b.tx || "",
+      const details: BundleDetail[] = (data.wallets || []).map((w) => ({
+        wallet: w.wallet || "",
+        balance: w.balance || 0,
+        percentage: w.percentage || 0,
+        initialBalance: w.initialBalance || 0,
+        initialPercentage: w.initialPercentage || 0,
+        bundleTime: w.bundleTime || 0,
       }));
 
-      const bundled = data.bundled || details.length > 0;
-      const bundlePercentage = details.reduce((sum, d) => sum + d.percentage, 0);
+      const bundleCount = data.total ?? details.length;
+      const bundlePercentage = data.percentage ?? details.reduce((sum, d) => sum + d.percentage, 0);
+      const bundled = bundleCount > 0;
 
       // Fetch sniper info to include in bundle analysis
       let sniperInfo: SniperInfo | undefined;
@@ -846,12 +855,15 @@ export class SolanaTrackerAdapter implements MarketDataAdapter {
       }
 
       const sniperPct = sniperInfo?.sniperPercentage || 0;
-      const { score, level } = calculateRiskScore(bundled, bundlePercentage, details.length, sniperPct);
+      const { score, level } = calculateRiskScore(bundled, bundlePercentage, bundleCount, sniperPct);
 
       const result: BundleInfo = {
         bundled,
-        bundleCount: details.length,
+        bundleCount,
         bundlePercentage,
+        totalBalance: data.balance || 0,
+        initialBalance: data.initialBalance || 0,
+        initialPercentage: data.initialPercentage || 0,
         riskScore: score,
         riskLevel: level,
         details,
@@ -862,7 +874,7 @@ export class SolanaTrackerAdapter implements MarketDataAdapter {
       await safeSet(cacheKey, JSON.stringify(result), "EX", 120);
       return result;
     } catch {
-      return { bundled: false, bundleCount: 0, bundlePercentage: 0, riskScore: 0, riskLevel: "low", details: [] };
+      return { bundled: false, bundleCount: 0, bundlePercentage: 0, totalBalance: 0, initialBalance: 0, initialPercentage: 0, riskScore: 0, riskLevel: "low", details: [] };
     }
   }
 
