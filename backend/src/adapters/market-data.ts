@@ -28,7 +28,7 @@ export interface TokenInfo {
   socials?: TokenSocials;
 }
 
-export type WalletType = "whale" | "sniper" | "team" | "dex" | "cex" | "contract" | "unknown";
+export type WalletType = "whale" | "sniper" | "team" | "dex" | "cex" | "contract" | "liquidity_pool" | "unknown";
 
 export interface TokenHolder {
   address: string;

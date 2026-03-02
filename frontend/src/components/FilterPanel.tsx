@@ -27,11 +27,12 @@ interface FilterPanelProps {
   onApply: (filters: TokenFilterParams) => void;
   onClose: () => void;
   initialFilters?: TokenFilterParams;
+  columnType?: "new" | "migrating" | "migrated";
 }
 
 type DraftValues = Record<string, string>;
 
-export function FilterPanel({ onApply, onClose, initialFilters }: FilterPanelProps) {
+export function FilterPanel({ onApply, onClose, initialFilters, columnType }: FilterPanelProps) {
   const buildInitialDraft = useCallback((): DraftValues => {
     const draft: DraftValues = {};
     if (!initialFilters) return draft;
@@ -144,7 +145,11 @@ export function FilterPanel({ onApply, onClose, initialFilters }: FilterPanelPro
           </div>
 
           {/* Standard filter rows */}
-          {FILTER_FIELDS.map((field) => (
+          {FILTER_FIELDS.filter((field) => {
+            // Hide B. Curve filter for migrated (graduated) tokens — they are off bonding curve by definition
+            if (columnType === "migrated" && field.label === "B. Curve") return false;
+            return true;
+          }).map((field) => (
             <div key={field.label} className="flex items-center gap-3">
               <span className="w-24 text-sm text-text-secondary flex-shrink-0">{field.label}</span>
               <div className="flex-1 flex gap-2">

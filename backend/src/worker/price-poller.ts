@@ -4,7 +4,8 @@ import { SolanaTrackerAdapter } from "../adapters/solana-tracker";
 import { prisma } from "../lib/prisma";
 import { checkAndFillLimitOrders } from "../services/limit-order";
 
-const POLL_INTERVAL_MS = 15000;
+const POLL_INTERVAL_MS = 5000;
+
 const adapter = new SolanaTrackerAdapter();
 
 let priceQueue: Queue | null = null;

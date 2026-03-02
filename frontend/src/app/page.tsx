@@ -310,8 +310,8 @@ export default function LandingPage() {
   const { data: latestData, isLoading: latestLoading } = useQuery({
     queryKey: ["latestTokens"],
     queryFn: () => api.market.getLatestTokens(),
-    refetchInterval: 5_000,
-    staleTime: 3_000,
+    refetchInterval: 2_000,
+    staleTime: 1_000,
     refetchOnWindowFocus: false,
     placeholderData: keepPreviousData,
   });
@@ -319,8 +319,8 @@ export default function LandingPage() {
   const { data: graduatingData, isLoading: graduatingLoading } = useQuery({
     queryKey: ["graduatingTokens"],
     queryFn: () => api.market.getGraduatingTokens(),
-    refetchInterval: 5_000,
-    staleTime: 3_000,
+    refetchInterval: 2_000,
+    staleTime: 1_000,
     refetchOnWindowFocus: false,
     placeholderData: keepPreviousData,
   });
@@ -328,8 +328,8 @@ export default function LandingPage() {
   const { data: graduatedData, isLoading: graduatedLoading } = useQuery({
     queryKey: ["graduatedTokens"],
     queryFn: () => api.market.getGraduatedTokens(),
-    refetchInterval: 5_000,
-    staleTime: 3_000,
+    refetchInterval: 2_000,
+    staleTime: 1_000,
     refetchOnWindowFocus: false,
     placeholderData: keepPreviousData,
   });
@@ -354,8 +354,8 @@ export default function LandingPage() {
     queryKey: ["filteredNew", columnFilters.new],
     queryFn: () => api.market.getFilteredTokens({ ...columnFilters.new, sortBy: "createdAt", sortOrder: "desc" }),
     enabled: newHasFilters,
-    refetchInterval: 5_000,
-    staleTime: 3_000,
+    refetchInterval: 2_000,
+    staleTime: 1_000,
     refetchOnWindowFocus: false,
     placeholderData: keepPreviousData,
   });
@@ -364,8 +364,8 @@ export default function LandingPage() {
     queryKey: ["filteredMigrating", columnFilters.migrating],
     queryFn: () => api.market.getFilteredTokens({ ...columnFilters.migrating, status: "graduating" }),
     enabled: migratingHasFilters,
-    refetchInterval: 5_000,
-    staleTime: 3_000,
+    refetchInterval: 2_000,
+    staleTime: 1_000,
     refetchOnWindowFocus: false,
     placeholderData: keepPreviousData,
   });
@@ -374,8 +374,8 @@ export default function LandingPage() {
     queryKey: ["filteredMigrated", columnFilters.migrated],
     queryFn: () => api.market.getFilteredTokens({ ...columnFilters.migrated, status: "graduated" }),
     enabled: migratedHasFilters,
-    refetchInterval: 5_000,
-    staleTime: 3_000,
+    refetchInterval: 2_000,
+    staleTime: 1_000,
     refetchOnWindowFocus: false,
     placeholderData: keepPreviousData,
   });
@@ -430,6 +430,7 @@ export default function LandingPage() {
           initialFilters={columnFilters[filterOpen]}
           onApply={(f) => handleApplyFilter(filterOpen, f)}
           onClose={() => setFilterOpen(null)}
+          columnType={filterOpen}
         />
       )}
     </div>

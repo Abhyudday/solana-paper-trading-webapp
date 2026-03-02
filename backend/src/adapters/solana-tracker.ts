@@ -27,12 +27,19 @@ const KNOWN_WALLETS: Record<string, { type: WalletType; label: string }> = {
   "whirLbMiicVdio4qvUfM5KAg6Ct8VwpYzGff3uctyCc": { type: "dex", label: "Orca Whirlpool" },
   "TSWAPaqyCSx2KABk68Shruf4rp7CxcNi8hAsbdwmHbN": { type: "dex", label: "Tensor Swap" },
   "GDDMwNyyx8uB6zrqwBFHjLLG3TBYk2F8Az4yrQC5RzMp": { type: "cex", label: "Coinbase" },
+  // Liquidity pool wallets
+  "39azUYFWPz3VHgKCf3VChUwbpURdCHRxjWVowf5jUJjg": { type: "liquidity_pool", label: "Raydium LP" },
+  "7YttLkHDoNj9wyDur5pM1ejNaAvT9X4eSTaEroHBjLiQ": { type: "liquidity_pool", label: "Meteora LP" },
+  "FRhB8L7Y9Qq41qZXYLtC2nw8An1RJfLLMjAxrnT1DDh1": { type: "liquidity_pool", label: "Raydium CLMM" },
+  "3XXuUFfweXBwFgFfYaejLvZE4cGZiHgKiGfMtdxNzYmv": { type: "liquidity_pool", label: "Raydium CPMM" },
 };
 
 function classifyWallet(address: string, percentage: number, isInsider?: boolean): { type: WalletType; label?: string } {
   const known = KNOWN_WALLETS[address];
   if (known) return known;
   if (isInsider) return { type: "team", label: "Insider" };
+  // Large holders (>40%) that aren't known wallets are likely liquidity pools
+  if (percentage >= 40) return { type: "liquidity_pool", label: "Liquidity Pool" };
   if (percentage >= 5) return { type: "whale" };
   return { type: "unknown" };
 }
@@ -48,10 +55,10 @@ function calculateRiskScore(bundled: boolean, bundlePercentage: number, bundleCo
   return { score, level };
 }
 
-const CACHE_TTL_PRICE = 15; // seconds
+const CACHE_TTL_PRICE = 5; // seconds
 const CACHE_TTL_INFO = 300;
-const CACHE_TTL_TOP = 60;
-const CACHE_TTL_CHART = 30;
+const CACHE_TTL_TOP = 30;
+const CACHE_TTL_CHART = 5;
 
 async function fetchApi<T>(path: string, params?: Record<string, string>): Promise<T> {
   const url = new URL(path, config.SOLANA_TRACKER_BASE_URL);
@@ -493,6 +500,8 @@ export class SolanaTrackerAdapter implements MarketDataAdapter {
             volume24h: pool?.volume?.h24 || 0,
           };
         });
+      // Reverse so newest graduating tokens appear first
+      tokens.reverse();
     } catch {
       // tokens/multi/graduating not available, fall back to search endpoint
     }
@@ -515,7 +524,7 @@ export class SolanaTrackerAdapter implements MarketDataAdapter {
           }>;
         }>("search", {
           status: "graduating",
-          sortBy: "marketCap",
+          sortBy: "createdAt",
           sortOrder: "desc",
           limit: String(limit),
         });
@@ -556,7 +565,7 @@ export class SolanaTrackerAdapter implements MarketDataAdapter {
       try {
         const filtered = await this.getFilteredTokens({
           status: "graduating",
-          sortBy: "marketCap",
+          sortBy: "createdAt",
           sortOrder: "desc",
           limit,
         });

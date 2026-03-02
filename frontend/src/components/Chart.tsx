@@ -127,9 +127,12 @@ const INDICATORS: IndicatorOption[] = [
 
 // ──────────── Component ────────────
 
+type ChartMode = "price" | "mcap";
+
 interface ChartProps {
   data: OHLCVBar[];
   height?: number;
+  supply?: number;
 }
 
 function dedupAndSort(data: OHLCVBar[]) {
@@ -144,7 +147,8 @@ function dedupAndSort(data: OHLCVBar[]) {
     });
 }
 
-export const Chart = memo(function Chart({ data, height = 400 }: ChartProps) {
+export const Chart = memo(function Chart({ data, height = 400, supply }: ChartProps) {
+  const [chartMode, setChartMode] = useState<ChartMode>("price");
   const priceContainerRef = useRef<HTMLDivElement>(null);
   const volumeContainerRef = useRef<HTMLDivElement>(null);
   const rsiContainerRef = useRef<HTMLDivElement>(null);
@@ -180,6 +184,17 @@ export const Chart = memo(function Chart({ data, height = 400 }: ChartProps) {
       return;
     }
 
+    // If in market cap mode and supply is available, multiply prices by supply
+    const displayData = chartMode === "mcap" && supply && supply > 0
+      ? filtered.map((bar) => ({
+          ...bar,
+          open: bar.open * supply,
+          high: bar.high * supply,
+          low: bar.low * supply,
+          close: bar.close * supply,
+        }))
+      : filtered;
+
     setChartError(null);
 
     let priceChart: IChartApi | null = null;
@@ -189,10 +204,10 @@ export const Chart = memo(function Chart({ data, height = 400 }: ChartProps) {
     let resizeObserver: ResizeObserver | null = null;
 
     try {
-      const closes = filtered.map((b) => b.close);
-      const times = filtered.map((b) => b.time as Time);
+      const closes = displayData.map((b) => b.close);
+      const times = displayData.map((b) => b.time as Time);
 
-      const minPrice = filtered.reduce((min, b) => (b.low > 0 && b.low < min ? b.low : min), Infinity);
+      const minPrice = displayData.reduce((min, b) => (b.low > 0 && b.low < min ? b.low : min), Infinity);
       const priceDecimals = minPrice < 0.0001 ? 10 : minPrice < 0.01 ? 8 : minPrice < 1 ? 6 : 2;
       const formatPrice = (p: number): string => {
         if (p === 0) return "0";
@@ -308,7 +323,7 @@ export const Chart = memo(function Chart({ data, height = 400 }: ChartProps) {
       });
 
       // Prepare data
-      const mapped: CandlestickData<Time>[] = filtered.map((bar) => ({
+      const mapped: CandlestickData<Time>[] = displayData.map((bar) => ({
         time: bar.time as Time,
         open: bar.open,
         high: bar.high,
@@ -316,7 +331,7 @@ export const Chart = memo(function Chart({ data, height = 400 }: ChartProps) {
         close: bar.close,
       }));
 
-      const volumeData: HistogramData<Time>[] = filtered.map((bar) => ({
+      const volumeData: HistogramData<Time>[] = displayData.map((bar) => ({
         time: bar.time as Time,
         value: bar.volume,
         color: bar.close >= bar.open ? "rgba(0,200,83,0.55)" : "rgba(255,59,59,0.55)",
@@ -491,7 +506,7 @@ export const Chart = memo(function Chart({ data, height = 400 }: ChartProps) {
       rsiChartRef.current = null;
       macdChartRef.current = null;
     };
-  }, [data, height, volumeHeight, oscillatorHeight, activeIndicators, hasRSI, hasMACD]);
+  }, [data, height, volumeHeight, oscillatorHeight, activeIndicators, hasRSI, hasMACD, chartMode, supply]);
 
   const filtered = useMemo(() => dedupAndSort(data), [data]);
   if (filtered.length === 0 && !chartError) {
@@ -524,6 +539,26 @@ export const Chart = memo(function Chart({ data, height = 400 }: ChartProps) {
     <div className="w-full rounded-lg overflow-hidden chart-fade-in" role="img" aria-label="Token price chart">
       {/* Indicator toolbar */}
       <div className="flex items-center gap-1 px-2 py-1 bg-[#0b0e11] border-b border-[#1e2128]/50">
+        {/* Price / MCap toggle */}
+        <div className="flex items-center rounded bg-[#1a1d23] mr-1">
+          <button
+            onClick={() => setChartMode("price")}
+            className={`px-2 py-0.5 rounded text-[9px] font-semibold transition-colors ${
+              chartMode === "price" ? "bg-accent-green/15 text-accent-green" : "text-[#505258] hover:text-text-secondary"
+            }`}
+          >
+            Price
+          </button>
+          <button
+            onClick={() => setChartMode("mcap")}
+            className={`px-2 py-0.5 rounded text-[9px] font-semibold transition-colors ${
+              chartMode === "mcap" ? "bg-accent-green/15 text-accent-green" : "text-[#505258] hover:text-text-secondary"
+            }`}
+            title={!supply ? "Supply data needed for MCap chart" : undefined}
+          >
+            MCap
+          </button>
+        </div>
         <button
           onClick={() => setShowIndicatorPanel(!showIndicatorPanel)}
           className={`flex items-center gap-1 px-2 py-0.5 rounded text-[9px] font-semibold transition-colors ${

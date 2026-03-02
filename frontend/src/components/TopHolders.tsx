@@ -16,6 +16,7 @@ const WALLET_TYPE_CONFIG: Record<WalletType, { label: string; color: string; bg:
   dex: { label: "DEX", color: "text-accent-green", bg: "bg-accent-green/15" },
   cex: { label: "CEX", color: "text-accent-yellow", bg: "bg-accent-yellow/15" },
   contract: { label: "CONTRACT", color: "text-accent-blue", bg: "bg-accent-blue/15" },
+  liquidity_pool: { label: "LIQUIDITY POOL", color: "text-purple-400", bg: "bg-purple-400/15" },
   unknown: { label: "", color: "", bg: "" },
 };
 

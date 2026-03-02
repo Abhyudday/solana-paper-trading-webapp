@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import dynamic from "next/dynamic";
 import { useParams } from "next/navigation";
 import { useQuery, useQueryClient, keepPreviousData } from "@tanstack/react-query";
@@ -46,8 +46,8 @@ export default function TokenPage() {
     queryKey: ["token", mint],
     queryFn: () => api.market.getToken(mint),
     enabled: !!mint,
-    refetchInterval: 4_000,
-    staleTime: 3_000,
+    refetchInterval: 1_000,
+    staleTime: 500,
     placeholderData: keepPreviousData,
   });
 
@@ -56,13 +56,13 @@ export default function TokenPage() {
   const chartRefetchInterval = (() => {
     switch (range) {
       case "1s": return 1_000;
-      case "5s": return 2_000;
-      case "15s": return 3_000;
-      case "30s": return 3_000;
-      case "1m": return 5_000;
-      case "5m": return 10_000;
-      case "15m": return 15_000;
-      default: return 30_000;
+      case "5s": return 1_000;
+      case "15s": return 1_000;
+      case "30s": return 2_000;
+      case "1m": return 2_000;
+      case "5m": return 5_000;
+      case "15m": return 10_000;
+      default: return 15_000;
     }
   })();
 
@@ -71,7 +71,7 @@ export default function TokenPage() {
     queryFn: () => api.market.getChart(mint, range),
     enabled: !!mint,
     refetchInterval: chartRefetchInterval,
-    staleTime: isShortRange ? 2_000 : 8_000,
+    staleTime: isShortRange ? 500 : 5_000,
     placeholderData: keepPreviousData,
   });
 
@@ -129,6 +129,13 @@ export default function TokenPage() {
       });
     });
   }, [mint, range, queryClient]);
+
+  const [mintCopied, setMintCopied] = useState(false);
+  const handleCopyMint = useCallback(() => {
+    navigator.clipboard.writeText(mint);
+    setMintCopied(true);
+    setTimeout(() => setMintCopied(false), 1500);
+  }, [mint]);
 
   const usdcBalance = portfolio?.usdcBalance ?? 0;
   const position = portfolio?.positions.find((p) => p.mint === mint);
@@ -209,7 +216,26 @@ export default function TokenPage() {
               <span className="font-bold text-sm">{t.symbol}</span>
               <span className="text-[10px] text-text-muted">{t.name}</span>
             </div>
-            <span className="text-[9px] font-mono text-text-muted">{shortenAddress(mint, 6)}</span>
+            <span className="flex items-center gap-1">
+              <span className="text-[9px] font-mono text-text-muted">{shortenAddress(mint, 6)}</span>
+              <button
+                onClick={handleCopyMint}
+                className={`inline-flex items-center transition-colors ${
+                  mintCopied ? "text-accent-green" : "text-text-muted hover:text-text-primary"
+                }`}
+                title={mintCopied ? "Copied!" : "Copy mint address"}
+              >
+                {mintCopied ? (
+                  <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                  </svg>
+                ) : (
+                  <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M15.666 3.888A2.25 2.25 0 0013.5 2.25h-3c-1.03 0-1.9.693-2.166 1.638m7.332 0c.055.194.084.4.084.612v0a.75.75 0 01-.75.75H9.75a.75.75 0 01-.75-.75v0c0-.212.03-.418.084-.612m7.332 0c.646.049 1.288.11 1.927.184 1.1.128 1.907 1.077 1.907 2.185V19.5a2.25 2.25 0 01-2.25 2.25H6.75A2.25 2.25 0 014.5 19.5V6.257c0-1.108.806-2.057 1.907-2.185a48.208 48.208 0 011.927-.184" />
+                  </svg>
+                )}
+              </button>
+            </span>
           </div>
         </div>
 
@@ -269,7 +295,7 @@ export default function TokenPage() {
                 <span className="text-xs">Loading chart data...</span>
               </div>
             ) : chartBars.length > 0 ? (
-              <Chart data={chartBars} height={380} />
+              <Chart data={chartBars} height={380} supply={t.supply} />
             ) : (
               <div className="flex flex-col items-center justify-center h-[380px] text-text-muted bg-bg-primary gap-2">
                 <svg className="w-8 h-8 opacity-30" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>

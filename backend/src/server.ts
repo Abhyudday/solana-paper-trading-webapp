@@ -75,9 +75,9 @@ async function main() {
     const warmup = async () => {
       try {
         await Promise.all([
-          adapter.getLatestTokens(20),
-          adapter.getGraduatingTokens(20),
-          adapter.getGraduatedTokens(20),
+          adapter.getLatestTokens(50),
+          adapter.getGraduatingTokens(50),
+          adapter.getGraduatedTokens(50),
         ]);
       } catch {}
     };
@@ -85,7 +85,7 @@ async function main() {
     console.log("Cache warmup complete");
 
     // Continuous background refresh every 1.5s so cache is always warm
-    setInterval(warmup, 1_500);
+    setInterval(warmup, 1_000);
   } catch (err) {
     app.log.error(err);
     process.exit(1);
