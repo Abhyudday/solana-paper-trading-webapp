@@ -843,8 +843,20 @@ export class SolanaTrackerAdapter implements MarketDataAdapter {
       }));
 
       const bundleCount = data.total ?? details.length;
-      const bundlePercentage = data.percentage ?? details.reduce((sum, d) => sum + d.percentage, 0);
       const bundled = bundleCount > 0;
+
+      // Current holdings percentage (they may have sold since launch)
+      const topLevelCurrentPct = data.percentage || 0;
+      const summedCurrentPct = details.reduce((sum, d) => sum + d.percentage, 0);
+      const currentBundlePercentage = topLevelCurrentPct > 0 ? topLevelCurrentPct : summedCurrentPct;
+
+      // Initial percentage (how much was grabbed at launch — the meaningful risk metric)
+      const topLevelInitialPct = data.initialPercentage || 0;
+      const summedInitialPct = details.reduce((sum, d) => sum + d.initialPercentage, 0);
+      const initialBundlePct = topLevelInitialPct > 0 ? topLevelInitialPct : summedInitialPct;
+
+      // Use initial % as the primary bundle percentage; fall back to current if initial unavailable
+      const bundlePercentage = initialBundlePct > 0 ? initialBundlePct : currentBundlePercentage;
 
       // Fetch sniper info to include in bundle analysis
       let sniperInfo: SniperInfo | undefined;
@@ -861,6 +873,7 @@ export class SolanaTrackerAdapter implements MarketDataAdapter {
         bundled,
         bundleCount,
         bundlePercentage,
+        currentBundlePercentage,
         totalBalance: data.balance || 0,
         initialBalance: data.initialBalance || 0,
         initialPercentage: data.initialPercentage || 0,
@@ -874,7 +887,7 @@ export class SolanaTrackerAdapter implements MarketDataAdapter {
       await safeSet(cacheKey, JSON.stringify(result), "EX", 120);
       return result;
     } catch {
-      return { bundled: false, bundleCount: 0, bundlePercentage: 0, totalBalance: 0, initialBalance: 0, initialPercentage: 0, riskScore: 0, riskLevel: "low", details: [] };
+      return { bundled: false, bundleCount: 0, bundlePercentage: 0, currentBundlePercentage: 0, totalBalance: 0, initialBalance: 0, initialPercentage: 0, riskScore: 0, riskLevel: "low", details: [] };
     }
   }
 

@@ -61,6 +61,7 @@ export interface BundleInfo {
   bundled: boolean;
   bundleCount: number;
   bundlePercentage: number;
+  currentBundlePercentage: number;
   totalBalance: number;
   initialBalance: number;
   initialPercentage: number;
