@@ -118,12 +118,12 @@ export function BundleChecker({ mint }: BundleCheckerProps) {
                   <span className="text-[11px] font-mono font-semibold text-text-primary">{bundles.bundleCount}</span>
                 </div>
                 <div className="flex flex-col p-2 rounded bg-bg-tertiary/30">
-                  <span className="text-[8px] text-text-muted uppercase">Bundle % (Launch)</span>
+                  <span className="text-[8px] text-text-muted uppercase">Bundle %</span>
                   <span className={`text-[11px] font-mono font-semibold ${bundles.bundlePercentage > 20 ? "text-accent-red" : bundles.bundlePercentage > 5 ? "text-accent-yellow" : "text-text-primary"}`}>
                     {bundles.bundlePercentage.toFixed(2)}%
                   </span>
-                  {bundles.currentBundlePercentage > 0 && bundles.currentBundlePercentage !== bundles.bundlePercentage && (
-                    <span className="text-[8px] text-text-muted mt-0.5">Now: {bundles.currentBundlePercentage.toFixed(2)}%</span>
+                  {bundles.initialPercentage > 0 && bundles.initialPercentage !== bundles.bundlePercentage && (
+                    <span className="text-[8px] text-text-muted mt-0.5">Initial: {bundles.initialPercentage.toFixed(2)}%</span>
                   )}
                 </div>
                 <div className="flex flex-col p-2 rounded bg-bg-tertiary/30">

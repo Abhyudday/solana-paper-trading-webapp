@@ -217,7 +217,13 @@ export default function TokenPage() {
               <span className="text-[10px] text-text-muted">{t.name}</span>
             </div>
             <span className="flex items-center gap-1">
-              <span className="text-[9px] font-mono text-text-muted">{shortenAddress(mint, 6)}</span>
+              <button
+                onClick={handleCopyMint}
+                className={`text-[9px] font-mono transition-colors ${mintCopied ? "text-accent-green" : "text-text-muted hover:text-text-primary"}`}
+                title={mintCopied ? "Copied!" : "Click to copy address"}
+              >
+                {mintCopied ? "Copied!" : shortenAddress(mint, 6)}
+              </button>
               <button
                 onClick={handleCopyMint}
                 className={`inline-flex items-center transition-colors ${

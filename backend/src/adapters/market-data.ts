@@ -61,10 +61,9 @@ export interface BundleInfo {
   bundled: boolean;
   bundleCount: number;
   bundlePercentage: number;
-  currentBundlePercentage: number;
+  initialPercentage: number;
   totalBalance: number;
   initialBalance: number;
-  initialPercentage: number;
   riskScore: number;
   riskLevel: "low" | "medium" | "high" | "critical";
   details: BundleDetail[];

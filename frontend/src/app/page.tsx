@@ -53,6 +53,7 @@ function sortTokens(tokens: DisplayToken[], key: SortKey): DisplayToken[] {
 function TokenCard({ token, isNew }: { token: DisplayToken; isNew?: boolean }) {
   const queryClient = useQueryClient();
   const [imgError, setImgError] = useState(false);
+  const [mintCopied, setMintCopied] = useState(false);
 
   const handlePrefetch = useCallback(() => {
     queryClient.prefetchQuery({
@@ -105,9 +106,19 @@ function TokenCard({ token, isNew }: { token: DisplayToken; isNew?: boolean }) {
 
           {/* Stats Row */}
           <div className="flex items-center gap-3 mt-1.5">
-            <span className="text-[10px] font-mono text-text-muted">
-              {shortenAddress(token.mint, 4)}
-            </span>
+            <button
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                navigator.clipboard.writeText(token.mint);
+                setMintCopied(true);
+                setTimeout(() => setMintCopied(false), 1500);
+              }}
+              className={`text-[10px] font-mono transition-colors ${mintCopied ? "text-accent-green" : "text-text-muted hover:text-text-primary"}`}
+              title={mintCopied ? "Copied!" : "Click to copy address"}
+            >
+              {mintCopied ? "Copied!" : shortenAddress(token.mint, 4)}
+            </button>
             <span className="text-[10px] font-mono text-text-secondary ml-auto">
               {formatPrice(token.price)}
             </span>
