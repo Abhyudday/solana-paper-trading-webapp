@@ -158,8 +158,14 @@ export const Chart = memo(function Chart({ data, height = 400, supply, range }: 
   const volumeChartRef = useRef<IChartApi | null>(null);
   const rsiChartRef = useRef<IChartApi | null>(null);
   const macdChartRef = useRef<IChartApi | null>(null);
+  const candleSeriesRef = useRef<ISeriesApi<"Candlestick"> | null>(null);
+  const volumeSeriesRef = useRef<ISeriesApi<"Histogram"> | null>(null);
+  const overlaySeriesRef = useRef<ISeriesApi<SeriesType>[]>([]);
+  const rsiSeriesRef = useRef<{ rsi: ISeriesApi<"Line">; ob: ISeriesApi<"Line">; os: ISeriesApi<"Line"> } | null>(null);
+  const macdSeriesRef = useRef<{ line: ISeriesApi<"Line">; signal: ISeriesApi<"Line">; hist: ISeriesApi<"Histogram"> } | null>(null);
   const savedLogicalRangeRef = useRef<{ from: number; to: number } | null>(null);
   const prevRangeRef = useRef<string | undefined>(range);
+  const chartCreatedForRef = useRef<string>("");
   const [chartError, setChartError] = useState<string | null>(null);
   const [activeIndicators, setActiveIndicators] = useState<Set<IndicatorKey>>(new Set());
   const [showIndicatorPanel, setShowIndicatorPanel] = useState(false);
@@ -186,346 +192,270 @@ export const Chart = memo(function Chart({ data, height = 400, supply, range }: 
     }
   }, [range]);
 
+  // Build a key that determines when to RECREATE charts vs just update data
+  const structureKey = `${height}-${volumeHeight}-${oscillatorHeight}-${hasRSI}-${hasMACD}`;
+
+  // ── CHART CREATION (only on mount or structural changes) ──
   useEffect(() => {
     if (!priceContainerRef.current || !volumeContainerRef.current) return;
 
-    const filtered = dedupAndSort(data);
-    if (filtered.length === 0) {
-      setChartError(null);
-      return;
-    }
+    const chartOptions = {
+      layout: {
+        background: { color: "#0b0e11" },
+        textColor: "#505258",
+        fontFamily: "'Inter', system-ui, sans-serif",
+        fontSize: 11,
+      },
+      grid: {
+        vertLines: { color: "rgba(30,33,40,0.5)" },
+        horzLines: { color: "rgba(30,33,40,0.5)" },
+      },
+      crosshair: {
+        mode: 0 as const,
+        vertLine: { color: "rgba(0,200,83,0.3)", width: 1 as const, style: 2 as const, labelBackgroundColor: "#00c853" },
+        horzLine: { color: "rgba(0,200,83,0.3)", width: 1 as const, style: 2 as const, labelBackgroundColor: "#00c853" },
+      },
+    };
 
-    // If in market cap mode and supply is available, multiply prices by supply
-    const displayData = chartMode === "mcap" && supply && supply > 0
-      ? filtered.map((bar) => ({
-          ...bar,
-          open: bar.open * supply,
-          high: bar.high * supply,
-          low: bar.low * supply,
-          close: bar.close * supply,
-        }))
-      : filtered;
+    // --- Price chart ---
+    const priceChart = createChart(priceContainerRef.current!, {
+      ...chartOptions,
+      height,
+      rightPriceScale: { borderColor: "#1e2128", scaleMargins: { top: 0.05, bottom: 0.05 } },
+      timeScale: { borderColor: "#1e2128", timeVisible: true, secondsVisible: false },
+    });
+    const candleSeries = priceChart.addCandlestickSeries({
+      upColor: "#00c853", downColor: "#ff3b3b",
+      borderDownColor: "#ff3b3b", borderUpColor: "#00c853",
+      wickDownColor: "#ff3b3b99", wickUpColor: "#00c85399",
+    });
 
-    setChartError(null);
+    // --- Volume chart ---
+    const volChart = createChart(volumeContainerRef.current!, {
+      ...chartOptions,
+      height: volumeHeight,
+      rightPriceScale: { borderColor: "#1e2128", scaleMargins: { top: 0.1, bottom: 0 } },
+      timeScale: { borderColor: "#1e2128", timeVisible: true, secondsVisible: false, visible: !hasRSI && !hasMACD },
+    });
+    const volumeSeries = volChart.addHistogramSeries({ priceFormat: { type: "volume" }, priceScaleId: "right" });
 
-    let priceChart: IChartApi | null = null;
-    let volChart: IChartApi | null = null;
+    // --- RSI chart ---
     let rsiChart: IChartApi | null = null;
-    let macdChart: IChartApi | null = null;
-    let resizeObserver: ResizeObserver | null = null;
-
-    try {
-      const closes = displayData.map((b) => b.close);
-      const times = displayData.map((b) => b.time as Time);
-
-      const minPrice = displayData.reduce((min, b) => (b.low > 0 && b.low < min ? b.low : min), Infinity);
-      const priceDecimals = minPrice < 0.0001 ? 10 : minPrice < 0.01 ? 8 : minPrice < 1 ? 6 : 2;
-      const formatPrice = (p: number): string => {
-        if (p === 0) return "0";
-        return p.toFixed(priceDecimals);
-      };
-
-      const chartOptions = {
-        layout: {
-          background: { color: "#0b0e11" },
-          textColor: "#505258",
-          fontFamily: "'Inter', system-ui, sans-serif",
-          fontSize: 11,
-        },
-        grid: {
-          vertLines: { color: "rgba(30,33,40,0.5)" },
-          horzLines: { color: "rgba(30,33,40,0.5)" },
-        },
-        crosshair: {
-          mode: 0 as const,
-          vertLine: {
-            color: "rgba(0,200,83,0.3)",
-            width: 1 as const,
-            style: 2 as const,
-            labelBackgroundColor: "#00c853",
-          },
-          horzLine: {
-            color: "rgba(0,200,83,0.3)",
-            width: 1 as const,
-            style: 2 as const,
-            labelBackgroundColor: "#00c853",
-          },
-        },
-      };
-
-      // --- Price chart ---
-      priceChart = createChart(priceContainerRef.current!, {
-        ...chartOptions,
-        height,
-        rightPriceScale: {
-          borderColor: "#1e2128",
-          scaleMargins: { top: 0.05, bottom: 0.05 },
-        },
-        timeScale: {
-          borderColor: "#1e2128",
-          timeVisible: true,
-          secondsVisible: false,
-        },
-        localization: {
-          priceFormatter: formatPrice,
-        },
+    let rsiSeries: typeof rsiSeriesRef.current = null;
+    if (hasRSI && rsiContainerRef.current) {
+      rsiChart = createChart(rsiContainerRef.current, {
+        ...chartOptions, height: oscillatorHeight,
+        rightPriceScale: { borderColor: "#1e2128", scaleMargins: { top: 0.05, bottom: 0.05 } },
+        timeScale: { borderColor: "#1e2128", timeVisible: true, secondsVisible: false, visible: !hasMACD },
       });
-
-      const candleSeries = priceChart.addCandlestickSeries({
-        upColor: "#00c853",
-        downColor: "#ff3b3b",
-        borderDownColor: "#ff3b3b",
-        borderUpColor: "#00c853",
-        wickDownColor: "#ff3b3b99",
-        wickUpColor: "#00c85399",
-      });
-
-      // --- Overlay indicators on price chart ---
-      const addLineSeries = (values: (number | null)[], color: string, lineWidth: number = 1) => {
-        const series = priceChart!.addLineSeries({
-          color,
-          lineWidth: lineWidth as 1 | 2 | 3 | 4,
-          priceLineVisible: false,
-          lastValueVisible: false,
-          crosshairMarkerVisible: false,
-        });
-        const lineData: LineData<Time>[] = [];
-        for (let i = 0; i < values.length; i++) {
-          if (values[i] !== null) {
-            lineData.push({ time: times[i], value: values[i]! });
-          }
-        }
-        series.setData(lineData);
-        return series;
-      };
-
-      if (activeIndicators.has("ma7")) addLineSeries(calcSMA(closes, 7), "#f5c542", 1);
-      if (activeIndicators.has("ma25")) addLineSeries(calcSMA(closes, 25), "#42a5f5", 1);
-      if (activeIndicators.has("ma99")) addLineSeries(calcSMA(closes, 99), "#ab47bc", 1);
-      if (activeIndicators.has("ema12")) addLineSeries(calcEMA(closes, 12), "#26a69a", 1);
-      if (activeIndicators.has("ema26")) addLineSeries(calcEMA(closes, 26), "#ef5350", 1);
-
-      if (activeIndicators.has("bb")) {
-        const bb = calcBollingerBands(closes, 20, 2);
-        addLineSeries(bb.upper, "#78909c", 1);
-        addLineSeries(bb.middle, "#78909c88", 1);
-        addLineSeries(bb.lower, "#78909c", 1);
-      }
-
-      // --- Volume chart ---
-      volChart = createChart(volumeContainerRef.current!, {
-        ...chartOptions,
-        height: volumeHeight,
-        rightPriceScale: {
-          borderColor: "#1e2128",
-          scaleMargins: { top: 0.1, bottom: 0 },
-        },
-        timeScale: {
-          borderColor: "#1e2128",
-          timeVisible: true,
-          secondsVisible: false,
-          visible: !hasRSI && !hasMACD,
-        },
-      });
-
-      const volumeSeries = volChart.addHistogramSeries({
-        priceFormat: { type: "volume" },
-        priceScaleId: "right",
-      });
-
-      // Prepare data
-      const mapped: CandlestickData<Time>[] = displayData.map((bar) => ({
-        time: bar.time as Time,
-        open: bar.open,
-        high: bar.high,
-        low: bar.low,
-        close: bar.close,
-      }));
-
-      const volumeData: HistogramData<Time>[] = displayData.map((bar) => ({
-        time: bar.time as Time,
-        value: bar.volume,
-        color: bar.close >= bar.open ? "rgba(0,200,83,0.55)" : "rgba(255,59,59,0.55)",
-      }));
-
-      candleSeries.setData(mapped);
-      volumeSeries.setData(volumeData);
-
-      // --- RSI chart ---
-      if (hasRSI && rsiContainerRef.current) {
-        rsiChart = createChart(rsiContainerRef.current, {
-          ...chartOptions,
-          height: oscillatorHeight,
-          rightPriceScale: {
-            borderColor: "#1e2128",
-            scaleMargins: { top: 0.05, bottom: 0.05 },
-          },
-          timeScale: {
-            borderColor: "#1e2128",
-            timeVisible: true,
-            secondsVisible: false,
-            visible: !hasMACD,
-          },
-        });
-
-        const rsiValues = calcRSI(closes, 14);
-        const rsiSeries = rsiChart.addLineSeries({
-          color: "#ff9800",
-          lineWidth: 2,
-          priceLineVisible: false,
-          lastValueVisible: true,
-        });
-        const rsiData: LineData<Time>[] = [];
-        for (let i = 0; i < rsiValues.length; i++) {
-          if (rsiValues[i] !== null) {
-            rsiData.push({ time: times[i], value: rsiValues[i]! });
-          }
-        }
-        rsiSeries.setData(rsiData);
-
-        // Overbought/oversold lines
-        const ob70: LineData<Time>[] = rsiData.map((d) => ({ time: d.time, value: 70 }));
-        const os30: LineData<Time>[] = rsiData.map((d) => ({ time: d.time, value: 30 }));
-        const obSeries = rsiChart.addLineSeries({ color: "rgba(255,59,59,0.3)", lineWidth: 1, priceLineVisible: false, lastValueVisible: false, lineStyle: 2 });
-        const osSeries = rsiChart.addLineSeries({ color: "rgba(0,200,83,0.3)", lineWidth: 1, priceLineVisible: false, lastValueVisible: false, lineStyle: 2 });
-        obSeries.setData(ob70);
-        osSeries.setData(os30);
-
-      }
-
-      // --- MACD chart ---
-      if (hasMACD && macdContainerRef.current) {
-        macdChart = createChart(macdContainerRef.current, {
-          ...chartOptions,
-          height: oscillatorHeight,
-          rightPriceScale: {
-            borderColor: "#1e2128",
-            scaleMargins: { top: 0.1, bottom: 0.1 },
-          },
-          timeScale: {
-            borderColor: "#1e2128",
-            timeVisible: true,
-            secondsVisible: false,
-            visible: true,
-          },
-        });
-
-        const macdData = calcMACD(closes, 12, 26, 9);
-        const macdLineSeries = macdChart.addLineSeries({ color: "#e040fb", lineWidth: 2, priceLineVisible: false, lastValueVisible: true });
-        const signalSeries = macdChart.addLineSeries({ color: "#ff9800", lineWidth: 1, priceLineVisible: false, lastValueVisible: false });
-        const histSeries = macdChart.addHistogramSeries({ priceFormat: { type: "volume" }, priceScaleId: "right" });
-
-        const macdLineData: LineData<Time>[] = [];
-        const signalLineData: LineData<Time>[] = [];
-        const histogramData: HistogramData<Time>[] = [];
-        for (let i = 0; i < macdData.macd.length; i++) {
-          if (macdData.macd[i] !== null) {
-            macdLineData.push({ time: times[i], value: macdData.macd[i]! });
-          }
-          if (macdData.signal[i] !== null) {
-            signalLineData.push({ time: times[i], value: macdData.signal[i]! });
-          }
-          if (macdData.histogram[i] !== null) {
-            histogramData.push({
-              time: times[i],
-              value: macdData.histogram[i]!,
-              color: macdData.histogram[i]! >= 0 ? "rgba(0,200,83,0.5)" : "rgba(255,59,59,0.5)",
-            });
-          }
-        }
-        macdLineSeries.setData(macdLineData);
-        signalSeries.setData(signalLineData);
-        histSeries.setData(histogramData);
-
-      }
-
-      // Collect all active charts
-      const allCharts = [priceChart, volChart, rsiChart, macdChart].filter(Boolean) as IChartApi[];
-
-      // Restore user's viewport if they've zoomed/scrolled, otherwise fit content
-      if (savedLogicalRangeRef.current) {
-        const r = savedLogicalRangeRef.current;
-        allCharts.forEach((c) => {
-          try { c.timeScale().setVisibleLogicalRange(r); } catch {}
-        });
-      } else {
-        allCharts.forEach((c) => c.timeScale().fitContent());
-        const MAX_BAR_SPACING = 10;
-        if (displayData.length < 60) {
-          allCharts.forEach((c) => c.timeScale().applyOptions({ barSpacing: MAX_BAR_SPACING, rightOffset: 5 }));
-        }
-      }
-
-      // Sync all chart time scales
-      for (let i = 0; i < allCharts.length; i++) {
-        for (let j = 0; j < allCharts.length; j++) {
-          if (i !== j) {
-            const src = allCharts[i];
-            const dst = allCharts[j];
-            src.timeScale().subscribeVisibleLogicalRangeChange((range) => {
-              if (range) {
-                try { dst.timeScale().setVisibleLogicalRange(range); } catch {}
-              }
-            });
-          }
-        }
-      }
-
-      // Persist user's viewport position across data refreshes
-      priceChart.timeScale().subscribeVisibleLogicalRangeChange((logicalRange) => {
-        if (logicalRange) savedLogicalRangeRef.current = logicalRange;
-      });
-
-      // Sync crosshairs between price and volume
-      const pChart = priceChart;
-      const vChart = volChart;
-      pChart.subscribeCrosshairMove((param) => {
-        if (param.time) {
-          vChart.setCrosshairPosition(NaN, param.time, volumeSeries);
-        } else {
-          vChart.clearCrosshairPosition();
-        }
-      });
-      vChart.subscribeCrosshairMove((param) => {
-        if (param.time) {
-          pChart.setCrosshairPosition(NaN, param.time, candleSeries);
-        } else {
-          pChart.clearCrosshairPosition();
-        }
-      });
-
-      priceChartRef.current = pChart;
-      volumeChartRef.current = vChart;
-      rsiChartRef.current = rsiChart;
-      macdChartRef.current = macdChart;
-
-      resizeObserver = new ResizeObserver(() => {
-        if (priceContainerRef.current) {
-          const w = priceContainerRef.current.clientWidth;
-          if (w > 0) {
-            allCharts.forEach((c) => c.applyOptions({ width: w }));
-          }
-        }
-      });
-      resizeObserver.observe(priceContainerRef.current!);
-
-    } catch (err) {
-      console.error("Chart creation error:", err);
-      setChartError("Failed to render chart");
+      const rsi = rsiChart.addLineSeries({ color: "#ff9800", lineWidth: 2, priceLineVisible: false, lastValueVisible: true });
+      const ob = rsiChart.addLineSeries({ color: "rgba(255,59,59,0.3)", lineWidth: 1, priceLineVisible: false, lastValueVisible: false, lineStyle: 2 });
+      const os = rsiChart.addLineSeries({ color: "rgba(0,200,83,0.3)", lineWidth: 1, priceLineVisible: false, lastValueVisible: false, lineStyle: 2 });
+      rsiSeries = { rsi, ob, os };
     }
+
+    // --- MACD chart ---
+    let macdChart: IChartApi | null = null;
+    let macdSeries: typeof macdSeriesRef.current = null;
+    if (hasMACD && macdContainerRef.current) {
+      macdChart = createChart(macdContainerRef.current, {
+        ...chartOptions, height: oscillatorHeight,
+        rightPriceScale: { borderColor: "#1e2128", scaleMargins: { top: 0.1, bottom: 0.1 } },
+        timeScale: { borderColor: "#1e2128", timeVisible: true, secondsVisible: false, visible: true },
+      });
+      const line = macdChart.addLineSeries({ color: "#e040fb", lineWidth: 2, priceLineVisible: false, lastValueVisible: true });
+      const signal = macdChart.addLineSeries({ color: "#ff9800", lineWidth: 1, priceLineVisible: false, lastValueVisible: false });
+      const hist = macdChart.addHistogramSeries({ priceFormat: { type: "volume" }, priceScaleId: "right" });
+      macdSeries = { line, signal, hist };
+    }
+
+    // Sync time scales
+    const allCharts = [priceChart, volChart, rsiChart, macdChart].filter(Boolean) as IChartApi[];
+    for (let i = 0; i < allCharts.length; i++) {
+      for (let j = 0; j < allCharts.length; j++) {
+        if (i !== j) {
+          const src = allCharts[i]; const dst = allCharts[j];
+          src.timeScale().subscribeVisibleLogicalRangeChange((r) => { if (r) { try { dst.timeScale().setVisibleLogicalRange(r); } catch {} } });
+        }
+      }
+    }
+
+    // Persist viewport
+    priceChart.timeScale().subscribeVisibleLogicalRangeChange((lr) => { if (lr) savedLogicalRangeRef.current = lr; });
+
+    // Sync crosshairs
+    priceChart.subscribeCrosshairMove((p) => { if (p.time) volChart.setCrosshairPosition(NaN, p.time, volumeSeries); else volChart.clearCrosshairPosition(); });
+    volChart.subscribeCrosshairMove((p) => { if (p.time) priceChart.setCrosshairPosition(NaN, p.time, candleSeries); else priceChart.clearCrosshairPosition(); });
+
+    // Resize observer
+    const resizeObserver = new ResizeObserver(() => {
+      if (priceContainerRef.current) {
+        const w = priceContainerRef.current.clientWidth;
+        if (w > 0) allCharts.forEach((c) => c.applyOptions({ width: w }));
+      }
+    });
+    resizeObserver.observe(priceContainerRef.current!);
+
+    // Store refs
+    priceChartRef.current = priceChart;
+    volumeChartRef.current = volChart;
+    rsiChartRef.current = rsiChart;
+    macdChartRef.current = macdChart;
+    candleSeriesRef.current = candleSeries;
+    volumeSeriesRef.current = volumeSeries;
+    rsiSeriesRef.current = rsiSeries;
+    macdSeriesRef.current = macdSeries;
+    overlaySeriesRef.current = [];
+    chartCreatedForRef.current = "";
 
     return () => {
-      resizeObserver?.disconnect();
-      try { priceChart?.remove(); } catch {}
-      try { volChart?.remove(); } catch {}
+      resizeObserver.disconnect();
+      try { priceChart.remove(); } catch {}
+      try { volChart.remove(); } catch {}
       try { rsiChart?.remove(); } catch {}
       try { macdChart?.remove(); } catch {}
       priceChartRef.current = null;
       volumeChartRef.current = null;
       rsiChartRef.current = null;
       macdChartRef.current = null;
+      candleSeriesRef.current = null;
+      volumeSeriesRef.current = null;
+      rsiSeriesRef.current = null;
+      macdSeriesRef.current = null;
+      overlaySeriesRef.current = [];
+      chartCreatedForRef.current = "";
     };
-  }, [data, height, volumeHeight, oscillatorHeight, activeIndicators, hasRSI, hasMACD, chartMode, supply, range]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [structureKey]);
+
+  // ── DATA UPDATE (runs on every data change — NO chart recreation) ──
+  useEffect(() => {
+    const priceChart = priceChartRef.current;
+    const candleSeries = candleSeriesRef.current;
+    const volumeSeries = volumeSeriesRef.current;
+    if (!priceChart || !candleSeries || !volumeSeries) return;
+
+    const filtered = dedupAndSort(data);
+    if (filtered.length === 0) return;
+
+    const displayData = chartMode === "mcap" && supply && supply > 0
+      ? filtered.map((bar) => ({ ...bar, open: bar.open * supply, high: bar.high * supply, low: bar.low * supply, close: bar.close * supply }))
+      : filtered;
+
+    setChartError(null);
+
+    // Update price formatter based on current data
+    const minPrice = displayData.reduce((min, b) => (b.low > 0 && b.low < min ? b.low : min), Infinity);
+    const priceDecimals = minPrice < 0.0001 ? 10 : minPrice < 0.01 ? 8 : minPrice < 1 ? 6 : 2;
+    priceChart.applyOptions({ localization: { priceFormatter: (p: number) => p === 0 ? "0" : p.toFixed(priceDecimals) } });
+
+    const closes = displayData.map((b) => b.close);
+    const times = displayData.map((b) => b.time as Time);
+
+    // Update candle + volume data
+    const mapped: CandlestickData<Time>[] = displayData.map((bar) => ({
+      time: bar.time as Time, open: bar.open, high: bar.high, low: bar.low, close: bar.close,
+    }));
+    const volumeData: HistogramData<Time>[] = displayData.map((bar) => ({
+      time: bar.time as Time, value: bar.volume,
+      color: bar.close >= bar.open ? "rgba(0,200,83,0.55)" : "rgba(255,59,59,0.55)",
+    }));
+    candleSeries.setData(mapped);
+    volumeSeries.setData(volumeData);
+
+    // Build indicator key to detect changes
+    const indicatorKey = Array.from(activeIndicators).sort().join(",");
+    const dataKey = `${indicatorKey}-${chartMode}-${supply || 0}`;
+
+    // Remove old overlay series if indicator set changed
+    if (chartCreatedForRef.current !== dataKey) {
+      for (const s of overlaySeriesRef.current) {
+        try { priceChart.removeSeries(s); } catch {}
+      }
+      overlaySeriesRef.current = [];
+
+      // Re-add overlay indicators
+      const addOverlay = (values: (number | null)[], color: string, lw: number = 1) => {
+        const series = priceChart.addLineSeries({
+          color, lineWidth: lw as 1 | 2 | 3 | 4,
+          priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false,
+        });
+        const ld: LineData<Time>[] = [];
+        for (let i = 0; i < values.length; i++) { if (values[i] !== null) ld.push({ time: times[i], value: values[i]! }); }
+        series.setData(ld);
+        overlaySeriesRef.current.push(series);
+        return series;
+      };
+
+      if (activeIndicators.has("ma7")) addOverlay(calcSMA(closes, 7), "#f5c542");
+      if (activeIndicators.has("ma25")) addOverlay(calcSMA(closes, 25), "#42a5f5");
+      if (activeIndicators.has("ma99")) addOverlay(calcSMA(closes, 99), "#ab47bc");
+      if (activeIndicators.has("ema12")) addOverlay(calcEMA(closes, 12), "#26a69a");
+      if (activeIndicators.has("ema26")) addOverlay(calcEMA(closes, 26), "#ef5350");
+      if (activeIndicators.has("bb")) {
+        const bb = calcBollingerBands(closes, 20, 2);
+        addOverlay(bb.upper, "#78909c"); addOverlay(bb.middle, "#78909c88"); addOverlay(bb.lower, "#78909c");
+      }
+
+      chartCreatedForRef.current = dataKey;
+    } else {
+      // Same indicators — just update overlay data in place
+      let idx = 0;
+      const updateOverlay = (values: (number | null)[]) => {
+        if (idx < overlaySeriesRef.current.length) {
+          const ld: LineData<Time>[] = [];
+          for (let i = 0; i < values.length; i++) { if (values[i] !== null) ld.push({ time: times[i], value: values[i]! }); }
+          overlaySeriesRef.current[idx].setData(ld);
+          idx++;
+        }
+      };
+      if (activeIndicators.has("ma7")) updateOverlay(calcSMA(closes, 7));
+      if (activeIndicators.has("ma25")) updateOverlay(calcSMA(closes, 25));
+      if (activeIndicators.has("ma99")) updateOverlay(calcSMA(closes, 99));
+      if (activeIndicators.has("ema12")) updateOverlay(calcEMA(closes, 12));
+      if (activeIndicators.has("ema26")) updateOverlay(calcEMA(closes, 26));
+      if (activeIndicators.has("bb")) {
+        const bb = calcBollingerBands(closes, 20, 2);
+        updateOverlay(bb.upper); updateOverlay(bb.middle); updateOverlay(bb.lower);
+      }
+    }
+
+    // Update RSI data
+    if (rsiSeriesRef.current) {
+      const rsiValues = calcRSI(closes, 14);
+      const rsiData: LineData<Time>[] = [];
+      for (let i = 0; i < rsiValues.length; i++) { if (rsiValues[i] !== null) rsiData.push({ time: times[i], value: rsiValues[i]! }); }
+      rsiSeriesRef.current.rsi.setData(rsiData);
+      rsiSeriesRef.current.ob.setData(rsiData.map((d) => ({ time: d.time, value: 70 })));
+      rsiSeriesRef.current.os.setData(rsiData.map((d) => ({ time: d.time, value: 30 })));
+    }
+
+    // Update MACD data
+    if (macdSeriesRef.current) {
+      const macdCalc = calcMACD(closes, 12, 26, 9);
+      const mld: LineData<Time>[] = []; const sld: LineData<Time>[] = []; const hld: HistogramData<Time>[] = [];
+      let vi = 0;
+      for (let i = 0; i < macdCalc.macd.length; i++) {
+        if (macdCalc.macd[i] === null) continue;
+        mld.push({ time: times[i], value: macdCalc.macd[i]! });
+        if (macdCalc.signal[vi] !== null) sld.push({ time: times[i], value: macdCalc.signal[vi]! });
+        if (macdCalc.histogram[vi] !== null) hld.push({ time: times[i], value: macdCalc.histogram[vi]!, color: macdCalc.histogram[vi]! >= 0 ? "rgba(0,200,83,0.5)" : "rgba(255,59,59,0.5)" });
+        vi++;
+      }
+      macdSeriesRef.current.line.setData(mld);
+      macdSeriesRef.current.signal.setData(sld);
+      macdSeriesRef.current.hist.setData(hld);
+    }
+
+    // On first data load or timeframe change, fit content; otherwise preserve viewport
+    if (!savedLogicalRangeRef.current) {
+      const allCharts = [priceChartRef.current, volumeChartRef.current, rsiChartRef.current, macdChartRef.current].filter(Boolean) as IChartApi[];
+      allCharts.forEach((c) => c.timeScale().fitContent());
+      if (displayData.length < 60) {
+        allCharts.forEach((c) => c.timeScale().applyOptions({ barSpacing: 10, rightOffset: 5 }));
+      }
+    }
+  }, [data, chartMode, supply, activeIndicators]);
 
   const filtered = useMemo(() => dedupAndSort(data), [data]);
   if (filtered.length === 0 && !chartError) {

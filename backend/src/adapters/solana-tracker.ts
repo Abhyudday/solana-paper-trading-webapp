@@ -831,7 +831,7 @@ export class SolanaTrackerAdapter implements MarketDataAdapter {
           initialPercentage?: number;
           bundleTime?: number;
         }>;
-      }>(`tokens/${mint}/bundlers`);
+      }>(`/tokens/${mint}/bundlers`);
 
       const details: BundleDetail[] = (data.wallets || []).map((w) => ({
         wallet: w.wallet || "",
