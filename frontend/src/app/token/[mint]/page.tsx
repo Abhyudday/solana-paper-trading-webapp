@@ -130,6 +130,27 @@ export default function TokenPage() {
     });
   }, [mint, range, queryClient]);
 
+  // Real-time: patch last candle from WS price updates between API polls
+  useEffect(() => {
+    if (!mint) return;
+    const unsub = wsClient.on("price", (msg) => {
+      if (msg.mint !== mint) return;
+      const price = msg.price as number;
+      if (!price || price <= 0) return;
+      queryClient.setQueryData<import("@/lib/api").OHLCVBar[]>(["chart", mint, range], (old) => {
+        if (!old || old.length === 0) return old;
+        const updated = [...old];
+        const last = { ...updated[updated.length - 1] };
+        last.close = price;
+        if (price > last.high) last.high = price;
+        if (price < last.low || last.low === 0) last.low = price;
+        updated[updated.length - 1] = last;
+        return updated;
+      });
+    });
+    return unsub;
+  }, [mint, range, queryClient]);
+
   const [mintCopied, setMintCopied] = useState(false);
   const handleCopyMint = useCallback(() => {
     navigator.clipboard.writeText(mint);

@@ -202,23 +202,27 @@ export class SolanaTrackerAdapter implements MarketDataAdapter {
 
   async getOHLCV(mint: string, range: ChartRange): Promise<OHLCVBar[]> {
     const cacheKey = `chart:${mint}:${range}`;
-    const memHit = memCache.get<OHLCVBar[]>(cacheKey);
-    if (memHit) return memHit;
+    const isUltraShort = ["1s", "5s", "15s"].includes(range);
+    const isShortRange = ["30s", "1m"].includes(range);
+    const memTtl = isUltraShort ? 0 : isShortRange ? 1 : 8;
+    const redisTtl = isUltraShort ? 1 : isShortRange ? 3 : CACHE_TTL_CHART;
+
+    // Skip memCache for ultra-short to always get freshest from Redis/API
+    if (!isUltraShort) {
+      const memHit = memCache.get<OHLCVBar[]>(cacheKey);
+      if (memHit) return memHit;
+    }
 
     const cached = await safeGet(cacheKey);
     if (cached) {
       const parsed = JSON.parse(cached) as OHLCVBar[];
-      memCache.set(cacheKey, parsed, 15);
+      if (memTtl > 0) memCache.set(cacheKey, parsed, memTtl);
       return parsed;
     }
 
     const now = Math.floor(Date.now() / 1000);
     const from = now - rangeToSeconds(range);
     const interval = rangeToInterval(range);
-    // Shorter cache for sub-minute timeframes — 15s is default so optimize it
-    const isUltraShort = ["1s", "5s", "15s"].includes(range);
-    const isShortRange = ["30s", "1m"].includes(range);
-    const chartCacheTtl = isUltraShort ? 3 : isShortRange ? 5 : CACHE_TTL_CHART;
 
     try {
       const data = await fetchApi<{
@@ -246,8 +250,8 @@ export class SolanaTrackerAdapter implements MarketDataAdapter {
         volume: b.volume || 0,
       }));
 
-      memCache.set(cacheKey, bars, isUltraShort ? 1 : isShortRange ? 3 : 15);
-      await safeSet(cacheKey, JSON.stringify(bars), "EX", chartCacheTtl);
+      if (memTtl > 0) memCache.set(cacheKey, bars, memTtl);
+      await safeSet(cacheKey, JSON.stringify(bars), "EX", redisTtl);
       return bars;
     } catch {
       return [];

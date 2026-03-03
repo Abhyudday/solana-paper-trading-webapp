@@ -166,6 +166,8 @@ export const Chart = memo(function Chart({ data, height = 400, supply, range }: 
   const savedLogicalRangeRef = useRef<{ from: number; to: number } | null>(null);
   const prevRangeRef = useRef<string | undefined>(range);
   const chartCreatedForRef = useRef<string>("");
+  const prevDataLenRef = useRef<number>(0);
+  const prevLastTimeRef = useRef<number>(0);
   const [chartError, setChartError] = useState<string | null>(null);
   const [activeIndicators, setActiveIndicators] = useState<Set<IndicatorKey>>(new Set());
   const [showIndicatorPanel, setShowIndicatorPanel] = useState(false);
@@ -344,6 +346,28 @@ export const Chart = memo(function Chart({ data, height = 400, supply, range }: 
 
     setChartError(null);
 
+    const lastBar = displayData[displayData.length - 1];
+    const isLastBarUpdate = displayData.length === prevDataLenRef.current
+      && lastBar.time === prevLastTimeRef.current
+      && displayData.length > 0;
+
+    // FAST PATH: only last bar changed (WS price tick) — use update() which is O(1)
+    if (isLastBarUpdate) {
+      const candleBar: CandlestickData<Time> = {
+        time: lastBar.time as Time, open: lastBar.open, high: lastBar.high, low: lastBar.low, close: lastBar.close,
+      };
+      const volBar: HistogramData<Time> = {
+        time: lastBar.time as Time, value: lastBar.volume,
+        color: lastBar.close >= lastBar.open ? "rgba(0,200,83,0.55)" : "rgba(255,59,59,0.55)",
+      };
+      candleSeries.update(candleBar);
+      volumeSeries.update(volBar);
+      return;
+    }
+
+    prevDataLenRef.current = displayData.length;
+    prevLastTimeRef.current = lastBar.time;
+
     // Update price formatter based on current data
     const minPrice = displayData.reduce((min, b) => (b.low > 0 && b.low < min ? b.low : min), Infinity);
     const priceDecimals = minPrice < 0.0001 ? 10 : minPrice < 0.01 ? 8 : minPrice < 1 ? 6 : 2;
@@ -352,7 +376,7 @@ export const Chart = memo(function Chart({ data, height = 400, supply, range }: 
     const closes = displayData.map((b) => b.close);
     const times = displayData.map((b) => b.time as Time);
 
-    // Update candle + volume data
+    // FULL PATH: new candles arrived — use setData() for complete refresh
     const mapped: CandlestickData<Time>[] = displayData.map((bar) => ({
       time: bar.time as Time, open: bar.open, high: bar.high, low: bar.low, close: bar.close,
     }));

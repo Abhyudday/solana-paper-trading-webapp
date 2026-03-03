@@ -72,6 +72,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     disconnect();
   }, [disconnect]);
 
+  // Connect WS eagerly for real-time price updates (even before auth)
+  useEffect(() => {
+    wsClient.connect();
+  }, []);
+
   useEffect(() => {
     if (connected && publicKey && !state.isAuthenticated && !state.isLoading) {
       login();
