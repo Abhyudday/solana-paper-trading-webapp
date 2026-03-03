@@ -170,6 +170,10 @@ export const Chart = memo(function Chart({ data, height = 400, supply, marketCap
   const chartCreatedForRef = useRef<string>("");
   const prevDataLenRef = useRef<number>(0);
   const prevLastTimeRef = useRef<number>(0);
+  const prevChartModeRef = useRef<ChartMode>("price");
+  const microTickRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const lastRealBarRef = useRef<OHLCVBar | null>(null);
+  const mcapMultiplierRef = useRef<number>(0);
   const [chartError, setChartError] = useState<string | null>(null);
   const [activeIndicators, setActiveIndicators] = useState<Set<IndicatorKey>>(new Set());
   const [showIndicatorPanel, setShowIndicatorPanel] = useState(false);
@@ -360,11 +364,20 @@ export const Chart = memo(function Chart({ data, height = 400, supply, marketCap
 
     setChartError(null);
 
+    // Store last real bar and multiplier for micro-tick generation
+    lastRealBarRef.current = filtered[filtered.length - 1];
+    mcapMultiplierRef.current = mcapMultiplier;
+
     const lastBar = displayData[displayData.length - 1];
-    const isLastBarUpdate = displayData.length === prevDataLenRef.current
+    const modeChanged = chartMode !== prevChartModeRef.current;
+    prevChartModeRef.current = chartMode;
+
+    const isLastBarUpdate = !modeChanged
+      && displayData.length === prevDataLenRef.current
       && lastBar.time === prevLastTimeRef.current
       && displayData.length > 0;
-    const isSingleNewCandle = displayData.length === prevDataLenRef.current + 1
+    const isSingleNewCandle = !modeChanged
+      && displayData.length === prevDataLenRef.current + 1
       && prevDataLenRef.current > 0;
 
     // FAST PATH: only last bar changed (WS price tick) — use update() which is O(1)
@@ -396,6 +409,9 @@ export const Chart = memo(function Chart({ data, height = 400, supply, marketCap
       prevLastTimeRef.current = lastBar.time;
       return;
     }
+
+    // MODE TOGGLE: save viewport before full setData so we can restore it
+    const savedRange = modeChanged ? savedLogicalRangeRef.current : null;
 
     prevDataLenRef.current = displayData.length;
     prevLastTimeRef.current = lastBar.time;
@@ -513,8 +529,14 @@ export const Chart = memo(function Chart({ data, height = 400, supply, marketCap
       macdSeriesRef.current.hist.setData(hld);
     }
 
-    // On first data load or timeframe change, fit content; otherwise preserve viewport
-    if (!savedLogicalRangeRef.current) {
+    // On mode toggle, restore the viewport so chart doesn't jump
+    if (modeChanged && savedRange) {
+      const allCharts = [priceChartRef.current, volumeChartRef.current, rsiChartRef.current, macdChartRef.current].filter(Boolean) as IChartApi[];
+      requestAnimationFrame(() => {
+        allCharts.forEach((c) => { try { c.timeScale().setVisibleLogicalRange(savedRange); } catch {} });
+      });
+    } else if (!savedLogicalRangeRef.current) {
+      // On first data load or timeframe change, fit content
       const allCharts = [priceChartRef.current, volumeChartRef.current, rsiChartRef.current, macdChartRef.current].filter(Boolean) as IChartApi[];
       allCharts.forEach((c) => c.timeScale().fitContent());
       if (displayData.length < 60) {
@@ -522,6 +544,42 @@ export const Chart = memo(function Chart({ data, height = 400, supply, marketCap
       }
     }
   }, [data, chartMode, supply, marketCap, currentPrice, activeIndicators]);
+
+  // ── MICRO-TICK: synthetic small movements between real updates for real-time feel ──
+  useEffect(() => {
+    // Clear any existing micro-tick interval
+    if (microTickRef.current) { clearInterval(microTickRef.current); microTickRef.current = null; }
+
+    const candleSeries = candleSeriesRef.current;
+    if (!candleSeries || !lastRealBarRef.current) return;
+
+    microTickRef.current = setInterval(() => {
+      const realBar = lastRealBarRef.current;
+      if (!realBar || !candleSeriesRef.current) return;
+
+      const mult = chartMode === "mcap" && mcapMultiplierRef.current > 0 ? mcapMultiplierRef.current : 1;
+      const baseClose = realBar.close * mult;
+      // Random walk: ±0.15% of the close
+      const jitter = baseClose * (Math.random() - 0.5) * 0.003;
+      const fakeClose = baseClose + jitter;
+      const fakeHigh = Math.max(realBar.high * mult, fakeClose);
+      const fakeLow = Math.min(realBar.low * mult, fakeClose);
+
+      try {
+        candleSeriesRef.current!.update({
+          time: realBar.time as Time,
+          open: realBar.open * mult,
+          high: fakeHigh,
+          low: fakeLow,
+          close: fakeClose,
+        });
+      } catch {}
+    }, 300);
+
+    return () => {
+      if (microTickRef.current) { clearInterval(microTickRef.current); microTickRef.current = null; }
+    };
+  }, [data, chartMode]);
 
   const filtered = useMemo(() => dedupAndSort(data), [data]);
   if (filtered.length === 0 && !chartError) {
