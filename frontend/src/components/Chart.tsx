@@ -391,7 +391,7 @@ export const Chart = memo(function Chart({ data, height = 400, supply, range }: 
 
     // Update price formatter based on current data
     const minPrice = displayData.reduce((min, b) => (b.low > 0 && b.low < min ? b.low : min), Infinity);
-    const isMcap = chartMode === "mcap";
+    const isMcap = chartMode === "mcap" && supply != null && supply > 0;
     const priceDecimals = isMcap ? 2 : (minPrice < 0.0001 ? 10 : minPrice < 0.01 ? 8 : minPrice < 1 ? 6 : 2);
     const priceFormatter = isMcap
       ? (p: number) => {
