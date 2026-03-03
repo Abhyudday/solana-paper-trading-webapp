@@ -133,6 +133,8 @@ interface ChartProps {
   data: OHLCVBar[];
   height?: number;
   supply?: number;
+  marketCap?: number;
+  currentPrice?: number;
   range?: string;
 }
 
@@ -148,7 +150,7 @@ function dedupAndSort(data: OHLCVBar[]) {
     });
 }
 
-export const Chart = memo(function Chart({ data, height = 400, supply, range }: ChartProps) {
+export const Chart = memo(function Chart({ data, height = 400, supply, marketCap, currentPrice, range }: ChartProps) {
   const [chartMode, setChartMode] = useState<ChartMode>("price");
   const priceContainerRef = useRef<HTMLDivElement>(null);
   const volumeContainerRef = useRef<HTMLDivElement>(null);
@@ -343,8 +345,17 @@ export const Chart = memo(function Chart({ data, height = 400, supply, range }: 
     const filtered = dedupAndSort(data);
     if (filtered.length === 0) return;
 
-    const displayData = chartMode === "mcap" && supply && supply > 0
-      ? filtered.map((bar) => ({ ...bar, open: bar.open * supply, high: bar.high * supply, low: bar.low * supply, close: bar.close * supply }))
+    // Compute MCap multiplier: prefer supply, fall back to marketCap/currentPrice
+    let mcapMultiplier = 0;
+    if (supply && supply > 0) {
+      mcapMultiplier = supply;
+    } else if (marketCap && currentPrice && currentPrice > 0) {
+      mcapMultiplier = marketCap / currentPrice;
+    }
+    const canShowMcap = chartMode === "mcap" && mcapMultiplier > 0;
+
+    const displayData = canShowMcap
+      ? filtered.map((bar) => ({ ...bar, open: bar.open * mcapMultiplier, high: bar.high * mcapMultiplier, low: bar.low * mcapMultiplier, close: bar.close * mcapMultiplier }))
       : filtered;
 
     setChartError(null);
@@ -391,7 +402,7 @@ export const Chart = memo(function Chart({ data, height = 400, supply, range }: 
 
     // Update price formatter based on current data
     const minPrice = displayData.reduce((min, b) => (b.low > 0 && b.low < min ? b.low : min), Infinity);
-    const isMcap = chartMode === "mcap" && supply != null && supply > 0;
+    const isMcap = canShowMcap;
     const priceDecimals = isMcap ? 2 : (minPrice < 0.0001 ? 10 : minPrice < 0.01 ? 8 : minPrice < 1 ? 6 : 2);
     const priceFormatter = isMcap
       ? (p: number) => {
@@ -420,7 +431,7 @@ export const Chart = memo(function Chart({ data, height = 400, supply, range }: 
 
     // Build indicator key to detect changes
     const indicatorKey = Array.from(activeIndicators).sort().join(",");
-    const dataKey = `${indicatorKey}-${chartMode}-${supply || 0}`;
+    const dataKey = `${indicatorKey}-${chartMode}-${mcapMultiplier}`;
 
     // Remove old overlay series if indicator set changed
     if (chartCreatedForRef.current !== dataKey) {
@@ -510,7 +521,7 @@ export const Chart = memo(function Chart({ data, height = 400, supply, range }: 
         allCharts.forEach((c) => c.timeScale().applyOptions({ barSpacing: 10, rightOffset: 5 }));
       }
     }
-  }, [data, chartMode, supply, activeIndicators]);
+  }, [data, chartMode, supply, marketCap, currentPrice, activeIndicators]);
 
   const filtered = useMemo(() => dedupAndSort(data), [data]);
   if (filtered.length === 0 && !chartError) {

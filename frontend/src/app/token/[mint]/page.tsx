@@ -341,7 +341,7 @@ export default function TokenPage() {
                     No data for {range.toUpperCase()} — showing {fallbackRange?.toUpperCase()} instead
                   </div>
                 )}
-                <Chart data={chartBars} height={380} supply={t.supply} range={usingFallback ? fallbackRange! : range} />
+                <Chart data={chartBars} height={380} supply={t.supply} marketCap={t.marketCap} currentPrice={t.price} range={usingFallback ? fallbackRange! : range} />
               </>
             ) : (
               <div className="flex flex-col items-center justify-center h-[380px] text-text-muted bg-bg-primary gap-2">
