@@ -168,8 +168,17 @@ function countActiveFilters(f: TokenFilterParams): number {
   return keys.filter((k) => f[k] !== undefined).length;
 }
 
+type TimeFilter = "1h" | "6h" | "24h" | "all";
+const TIME_FILTER_OPTIONS: { key: TimeFilter; label: string; ms: number }[] = [
+  { key: "1h", label: "1H", ms: 3_600_000 },
+  { key: "6h", label: "6H", ms: 21_600_000 },
+  { key: "24h", label: "24H", ms: 86_400_000 },
+  { key: "all", label: "All", ms: 0 },
+];
+
 function TokenColumn({
   title,
+  columnId,
   defaultTokens,
   filteredTokens,
   isLoading,
@@ -178,8 +187,10 @@ function TokenColumn({
   color,
   filters,
   onOpenFilter,
+  onTimeFilter,
 }: {
   title: string;
+  columnId: ColumnId;
   defaultTokens: TokenInfo[];
   filteredTokens: FilteredTokenItem[] | undefined;
   isLoading: boolean;
@@ -188,8 +199,10 @@ function TokenColumn({
   color: string;
   filters: TokenFilterParams;
   onOpenFilter: () => void;
+  onTimeFilter?: (tf: TimeFilter) => void;
 }) {
-  const [sort, setSort] = useState<SortKey>("default");
+  const [sort, setSort] = useState<SortKey>(columnId === "migrating" ? "mcap" : "default");
+  const [activeTimeFilter, setActiveTimeFilter] = useState<TimeFilter>("all");
   const hasFilters = countActiveFilters(filters) > 0;
   const filterCount = countActiveFilters(filters);
   const lastTokensRef = useRef<DisplayToken[]>([]);
@@ -235,41 +248,68 @@ function TokenColumn({
   return (
     <div className="flex flex-col min-w-0">
       {/* Column Header */}
-      <div className="flex items-center justify-between mb-2 px-1 py-2 border-b border-border">
-        <div className="flex items-center gap-2">
-          <span className={`h-2 w-2 rounded-full ${color} shadow-sm`} style={{ boxShadow: `0 0 6px ${color === 'bg-accent-green' ? '#00c853' : color === 'bg-accent-yellow' ? '#ffd600' : '#3b8bff'}40` }} />
-          <h2 className="text-xs font-bold text-text-primary uppercase tracking-wide">{title}</h2>
-          <span className="text-[10px] text-text-muted font-mono bg-bg-tertiary px-1.5 py-0.5 rounded">{displayTokens.length}</span>
-        </div>
-        <div className="flex items-center gap-1">
-          {/* Sort pills */}
-          {SORT_OPTIONS.map((opt) => (
+      <div className="mb-2 px-1.5 py-2 border-b border-border">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <span className={`h-2.5 w-2.5 rounded-full ${color} shadow-sm`} style={{ boxShadow: `0 0 8px ${color === 'bg-accent-green' ? '#00c853' : color === 'bg-accent-yellow' ? '#ffd600' : '#3b8bff'}50` }} />
+            <h2 className="text-[13px] font-extrabold text-text-primary uppercase tracking-wide">{title}</h2>
+            <span className="text-[10px] text-text-muted font-mono bg-bg-tertiary px-1.5 py-0.5 rounded-full">{displayTokens.length}</span>
+            {columnId === "migrating" && (
+              <span className="text-[9px] text-[#ffd600]/80 bg-[#ffd600]/10 px-1.5 py-0.5 rounded-full font-semibold">Highest MC first</span>
+            )}
+          </div>
+          <div className="flex items-center gap-1">
+            {/* Sort pills */}
+            {SORT_OPTIONS.map((opt) => (
+              <button
+                key={opt.key}
+                onClick={() => setSort(opt.key)}
+                className={`px-2 py-1 rounded text-[10px] font-medium transition-all ${
+                  sort === opt.key
+                    ? "bg-bg-tertiary text-text-primary shadow-sm"
+                    : "text-text-muted hover:text-text-secondary hover:bg-bg-tertiary/50"
+                }`}
+              >
+                {opt.label}
+              </button>
+            ))}
             <button
-              key={opt.key}
-              onClick={() => setSort(opt.key)}
-              className={`px-2 py-1 rounded text-[10px] font-medium transition-all ${
-                sort === opt.key
-                  ? "bg-bg-tertiary text-text-primary shadow-sm"
+              onClick={onOpenFilter}
+              className={`ml-1 flex items-center gap-1 px-2 py-1 rounded text-[10px] font-medium transition-all ${
+                hasFilters
+                  ? "bg-accent-blue/15 text-accent-blue"
                   : "text-text-muted hover:text-text-secondary hover:bg-bg-tertiary/50"
               }`}
             >
-              {opt.label}
+              <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
+              </svg>
+              {filterCount > 0 && <span>{filterCount}</span>}
             </button>
-          ))}
-          <button
-            onClick={onOpenFilter}
-            className={`ml-1 flex items-center gap-1 px-2 py-1 rounded text-[10px] font-medium transition-all ${
-              hasFilters
-                ? "bg-accent-blue/15 text-accent-blue"
-                : "text-text-muted hover:text-text-secondary hover:bg-bg-tertiary/50"
-            }`}
-          >
-            <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
-            </svg>
-            {filterCount > 0 && <span>{filterCount}</span>}
-          </button>
+          </div>
         </div>
+        {/* Time filter bar for New Pairs */}
+        {columnId === "new" && onTimeFilter && (
+          <div className="flex items-center gap-1 mt-1.5">
+            <span className="text-[9px] text-text-muted mr-1">Age:</span>
+            {TIME_FILTER_OPTIONS.map((tf) => (
+              <button
+                key={tf.key}
+                onClick={() => {
+                  setActiveTimeFilter(tf.key);
+                  onTimeFilter(tf.key);
+                }}
+                className={`px-2 py-0.5 rounded text-[10px] font-bold transition-all ${
+                  activeTimeFilter === tf.key
+                    ? "bg-accent-green/20 text-accent-green shadow-sm"
+                    : "text-text-muted hover:text-text-secondary hover:bg-bg-tertiary/50"
+                }`}
+              >
+                {tf.label}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Token list — shows ~6-7 cards with smooth scroll for more */}
@@ -396,12 +436,28 @@ export default function LandingPage() {
     setFilterOpen(null);
   }, []);
 
+  const handleTimeFilter = useCallback((tf: TimeFilter) => {
+    setColumnFilters((prev) => {
+      const tfOption = TIME_FILTER_OPTIONS.find((o) => o.key === tf);
+      if (!tfOption || tf === "all") {
+        const next = { ...prev.new };
+        delete next.minCreatedAt;
+        return { ...prev, new: next };
+      }
+      return {
+        ...prev,
+        new: { ...prev.new, minCreatedAt: Date.now() - tfOption.ms },
+      };
+    });
+  }, []);
+
   return (
     <div className="pt-2 pb-4">
       {/* 3-column trenches grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         <TokenColumn
           title="New Pairs"
+          columnId="new"
           defaultTokens={stableLatest}
           filteredTokens={filteredNew?.tokens}
           isLoading={latestLoading}
@@ -410,9 +466,11 @@ export default function LandingPage() {
           color="bg-accent-green"
           filters={columnFilters.new}
           onOpenFilter={() => setFilterOpen("new")}
+          onTimeFilter={handleTimeFilter}
         />
         <TokenColumn
           title="Migrating"
+          columnId="migrating"
           defaultTokens={stableGraduating}
           filteredTokens={filteredMigrating?.tokens}
           isLoading={graduatingLoading}
@@ -424,6 +482,7 @@ export default function LandingPage() {
         />
         <TokenColumn
           title="Migrated"
+          columnId="migrated"
           defaultTokens={stableGraduated}
           filteredTokens={filteredMigrated?.tokens}
           isLoading={graduatedLoading}

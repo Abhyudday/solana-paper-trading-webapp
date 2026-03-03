@@ -504,8 +504,8 @@ export class SolanaTrackerAdapter implements MarketDataAdapter {
             volume24h: pool?.volume?.h24 || 0,
           };
         });
-      // Reverse so newest graduating tokens appear first
-      tokens.reverse();
+      // Sort by market cap descending — tokens closest to graduation threshold appear first
+      tokens.sort((a, b) => b.marketCap - a.marketCap);
     } catch {
       // tokens/multi/graduating not available, fall back to search endpoint
     }
@@ -528,7 +528,7 @@ export class SolanaTrackerAdapter implements MarketDataAdapter {
           }>;
         }>("search", {
           status: "graduating",
-          sortBy: "createdAt",
+          sortBy: "marketCap",
           sortOrder: "desc",
           limit: String(limit),
         });
@@ -569,7 +569,7 @@ export class SolanaTrackerAdapter implements MarketDataAdapter {
       try {
         const filtered = await this.getFilteredTokens({
           status: "graduating",
-          sortBy: "createdAt",
+          sortBy: "marketCap",
           sortOrder: "desc",
           limit,
         });

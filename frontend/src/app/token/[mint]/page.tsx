@@ -73,6 +73,17 @@ export default function TokenPage() {
     refetchInterval: chartRefetchInterval,
     staleTime: isShortRange ? 500 : 5_000,
     placeholderData: keepPreviousData,
+    retry: 2,
+  });
+
+  // Fallback: if current range returns no bars, try a longer timeframe automatically
+  const fallbackRange = range === "15s" ? "1m" : range === "1m" ? "5m" : range === "5m" ? "15m" : null;
+  const { data: fallbackChartData } = useQuery({
+    queryKey: ["chart", mint, fallbackRange],
+    queryFn: () => api.market.getChart(mint, fallbackRange!),
+    enabled: !!mint && !!fallbackRange && !chartLoading && (chartData?.bars?.length ?? 0) === 0,
+    staleTime: 10_000,
+    placeholderData: keepPreviousData,
   });
 
   // Track last chart update time for LIVE indicator
@@ -161,7 +172,9 @@ export default function TokenPage() {
   const usdcBalance = portfolio?.usdcBalance ?? 0;
   const position = portfolio?.positions.find((p) => p.mint === mint);
   const tokenQty = position?.qty ?? 0;
-  const chartBars = chartData?.bars ?? [];
+  const primaryBars = chartData?.bars ?? [];
+  const chartBars = primaryBars.length > 0 ? primaryBars : (fallbackChartData?.bars ?? []);
+  const usingFallback = primaryBars.length === 0 && chartBars.length > 0;
 
   // Token not found — only after fetch completes with no data
   if (!tokenInfo && tokenFetched && !tokenLoading) {
@@ -322,7 +335,14 @@ export default function TokenPage() {
                 <span className="text-xs">Loading chart data...</span>
               </div>
             ) : chartBars.length > 0 ? (
-              <Chart data={chartBars} height={380} supply={t.supply} range={range} />
+              <>
+                {usingFallback && (
+                  <div className="px-2 py-1 bg-[#f59e0b]/10 text-[#f59e0b] text-[10px] font-medium text-center">
+                    No data for {range.toUpperCase()} — showing {fallbackRange?.toUpperCase()} instead
+                  </div>
+                )}
+                <Chart data={chartBars} height={380} supply={t.supply} range={usingFallback ? fallbackRange! : range} />
+              </>
             ) : (
               <div className="flex flex-col items-center justify-center h-[380px] text-text-muted bg-bg-primary gap-2">
                 <svg className="w-8 h-8 opacity-30" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>

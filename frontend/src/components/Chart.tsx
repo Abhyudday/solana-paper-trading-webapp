@@ -224,7 +224,10 @@ export const Chart = memo(function Chart({ data, height = 400, supply, range }: 
       ...chartOptions,
       height,
       rightPriceScale: { borderColor: "#1e2128", scaleMargins: { top: 0.05, bottom: 0.05 } },
-      timeScale: { borderColor: "#1e2128", timeVisible: true, secondsVisible: false },
+      timeScale: { borderColor: "#1e2128", timeVisible: true, secondsVisible: false, rightOffset: 3, minBarSpacing: 2 },
+      handleScroll: { mouseWheel: true, pressedMouseMove: true, horzTouchDrag: true, vertTouchDrag: true },
+      handleScale: { axisPressedMouseMove: true, mouseWheel: true, pinch: true },
+      kineticScroll: { mouse: true, touch: true },
     });
     const candleSeries = priceChart.addCandlestickSeries({
       upColor: "#00c853", downColor: "#ff3b3b",
@@ -350,6 +353,8 @@ export const Chart = memo(function Chart({ data, height = 400, supply, range }: 
     const isLastBarUpdate = displayData.length === prevDataLenRef.current
       && lastBar.time === prevLastTimeRef.current
       && displayData.length > 0;
+    const isSingleNewCandle = displayData.length === prevDataLenRef.current + 1
+      && prevDataLenRef.current > 0;
 
     // FAST PATH: only last bar changed (WS price tick) — use update() which is O(1)
     if (isLastBarUpdate) {
@@ -365,13 +370,39 @@ export const Chart = memo(function Chart({ data, height = 400, supply, range }: 
       return;
     }
 
+    // APPEND PATH: single new candle arrived — use update() instead of full setData()
+    if (isSingleNewCandle) {
+      const candleBar: CandlestickData<Time> = {
+        time: lastBar.time as Time, open: lastBar.open, high: lastBar.high, low: lastBar.low, close: lastBar.close,
+      };
+      const volBar: HistogramData<Time> = {
+        time: lastBar.time as Time, value: lastBar.volume,
+        color: lastBar.close >= lastBar.open ? "rgba(0,200,83,0.55)" : "rgba(255,59,59,0.55)",
+      };
+      candleSeries.update(candleBar);
+      volumeSeries.update(volBar);
+      prevDataLenRef.current = displayData.length;
+      prevLastTimeRef.current = lastBar.time;
+      return;
+    }
+
     prevDataLenRef.current = displayData.length;
     prevLastTimeRef.current = lastBar.time;
 
     // Update price formatter based on current data
     const minPrice = displayData.reduce((min, b) => (b.low > 0 && b.low < min ? b.low : min), Infinity);
-    const priceDecimals = minPrice < 0.0001 ? 10 : minPrice < 0.01 ? 8 : minPrice < 1 ? 6 : 2;
-    priceChart.applyOptions({ localization: { priceFormatter: (p: number) => p === 0 ? "0" : p.toFixed(priceDecimals) } });
+    const isMcap = chartMode === "mcap";
+    const priceDecimals = isMcap ? 2 : (minPrice < 0.0001 ? 10 : minPrice < 0.01 ? 8 : minPrice < 1 ? 6 : 2);
+    const priceFormatter = isMcap
+      ? (p: number) => {
+          if (p === 0) return "$0";
+          if (p >= 1_000_000_000) return `$${(p / 1_000_000_000).toFixed(2)}B`;
+          if (p >= 1_000_000) return `$${(p / 1_000_000).toFixed(2)}M`;
+          if (p >= 1_000) return `$${(p / 1_000).toFixed(1)}K`;
+          return `$${p.toFixed(2)}`;
+        }
+      : (p: number) => p === 0 ? "0" : p.toFixed(priceDecimals);
+    priceChart.applyOptions({ localization: { priceFormatter } });
 
     const closes = displayData.map((b) => b.close);
     const times = displayData.map((b) => b.time as Time);
@@ -513,25 +544,34 @@ export const Chart = memo(function Chart({ data, height = 400, supply, range }: 
       {/* Indicator toolbar */}
       <div className="flex items-center gap-1 px-2 py-1 bg-[#0b0e11] border-b border-[#1e2128]/50">
         {/* Price / MCap toggle */}
-        <div className="flex items-center rounded bg-[#1a1d23] mr-1">
+        <div className="flex items-center rounded-md bg-[#1a1d23] border border-[#1e2128] mr-2">
           <button
             onClick={() => setChartMode("price")}
-            className={`px-2 py-0.5 rounded text-[9px] font-semibold transition-colors ${
-              chartMode === "price" ? "bg-accent-green/15 text-accent-green" : "text-[#505258] hover:text-text-secondary"
+            className={`px-3 py-1 rounded-md text-[11px] font-bold tracking-wide transition-all ${
+              chartMode === "price"
+                ? "bg-accent-green/20 text-accent-green shadow-sm shadow-accent-green/10"
+                : "text-[#505258] hover:text-text-secondary"
             }`}
           >
             Price
           </button>
           <button
             onClick={() => setChartMode("mcap")}
-            className={`px-2 py-0.5 rounded text-[9px] font-semibold transition-colors ${
-              chartMode === "mcap" ? "bg-accent-green/15 text-accent-green" : "text-[#505258] hover:text-text-secondary"
+            className={`px-3 py-1 rounded-md text-[11px] font-bold tracking-wide transition-all ${
+              chartMode === "mcap"
+                ? "bg-[#f59e0b]/20 text-[#f59e0b] shadow-sm shadow-[#f59e0b]/10"
+                : "text-[#505258] hover:text-text-secondary"
             }`}
             title={!supply ? "Supply data needed for MCap chart" : undefined}
           >
             MCap
           </button>
         </div>
+        {chartMode === "mcap" && (
+          <span className="text-[9px] font-semibold text-[#f59e0b] bg-[#f59e0b]/10 px-2 py-0.5 rounded-full mr-1 animate-pulse">
+            Market Cap View
+          </span>
+        )}
         <button
           onClick={() => setShowIndicatorPanel(!showIndicatorPanel)}
           className={`flex items-center gap-1 px-2 py-0.5 rounded text-[9px] font-semibold transition-colors ${
