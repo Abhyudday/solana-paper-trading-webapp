@@ -141,21 +141,49 @@ export default function TokenPage() {
     });
   }, [mint, range, queryClient]);
 
-  // Real-time: patch last candle from WS price updates between API polls
+  // Real-time: patch last candle or create new one based on timeframe bucket
   useEffect(() => {
     if (!mint) return;
+
+    // Convert range to bucket duration in seconds
+    const bucketMap: Record<string, number> = {
+      "1s": 1, "5s": 5, "15s": 15, "30s": 30,
+      "1m": 60, "5m": 300, "15m": 900, "30m": 1800,
+      "1h": 3600, "6h": 21600, "1d": 86400, "7d": 604800, "30d": 2592000,
+    };
+    const bucketSec = bucketMap[range] ?? 1;
+
     const unsub = wsClient.on("price", (msg) => {
       if (msg.mint !== mint) return;
       const price = msg.price as number;
       if (!price || price <= 0) return;
+      const nowSec = Math.floor(Date.now() / 1000);
+      const currentBucket = Math.floor(nowSec / bucketSec) * bucketSec;
+
       queryClient.setQueryData<import("@/lib/api").OHLCVBar[]>(["chart", mint, range], (old) => {
         if (!old || old.length === 0) return old;
         const updated = [...old];
-        const last = { ...updated[updated.length - 1] };
-        last.close = price;
-        if (price > last.high) last.high = price;
-        if (price < last.low || last.low === 0) last.low = price;
-        updated[updated.length - 1] = last;
+        const last = updated[updated.length - 1];
+        const lastBucket = Math.floor(last.time / bucketSec) * bucketSec;
+
+        if (currentBucket === lastBucket) {
+          // Same time bucket — update high, low, close in place
+          const patched = { ...last };
+          patched.close = price;
+          if (price > patched.high) patched.high = price;
+          if (price < patched.low || patched.low === 0) patched.low = price;
+          updated[updated.length - 1] = patched;
+        } else {
+          // New time bucket — create a new candle
+          updated.push({
+            time: currentBucket,
+            open: price,
+            high: price,
+            low: price,
+            close: price,
+            volume: 0,
+          });
+        }
         return updated;
       });
     });

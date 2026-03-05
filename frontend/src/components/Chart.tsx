@@ -138,16 +138,46 @@ interface ChartProps {
   range?: string;
 }
 
-function dedupAndSort(data: OHLCVBar[]) {
-  const seen = new Set<number>();
-  return data
+/** Convert range string to bucket duration in seconds */
+function rangeToBucketSec(range?: string): number {
+  if (!range) return 1;
+  const map: Record<string, number> = {
+    "1s": 1, "5s": 5, "15s": 15, "30s": 30,
+    "1m": 60, "5m": 300, "15m": 900, "30m": 1800,
+    "1h": 3600, "6h": 21600, "1d": 86400, "7d": 604800, "30d": 2592000,
+  };
+  return map[range] ?? 1;
+}
+
+/** Aggregate bars into proper timeframe buckets.
+ *  Bars within the same bucket are merged: open=first, high=max, low=min, close=last, volume=sum.
+ *  This ensures a 1s candle persists during that second and only updates H/L/C. */
+function aggregateCandles(data: OHLCVBar[], range?: string): OHLCVBar[] {
+  const bucketSec = rangeToBucketSec(range);
+  const sorted = data
     .filter((bar) => bar.time > 0 && bar.open > 0)
-    .sort((a, b) => a.time - b.time)
-    .filter((bar) => {
-      if (seen.has(bar.time)) return false;
-      seen.add(bar.time);
-      return true;
-    });
+    .sort((a, b) => a.time - b.time);
+  if (sorted.length === 0) return [];
+
+  const result: OHLCVBar[] = [];
+  let current: OHLCVBar | null = null;
+
+  for (const bar of sorted) {
+    const bucketTime = Math.floor(bar.time / bucketSec) * bucketSec;
+    if (current && current.time === bucketTime) {
+      // Same bucket — merge: update high, low, close, accumulate volume
+      current.high = Math.max(current.high, bar.high);
+      current.low = Math.min(current.low, bar.low);
+      current.close = bar.close;
+      current.volume += bar.volume;
+    } else {
+      // New bucket — push previous and start new candle
+      if (current) result.push(current);
+      current = { ...bar, time: bucketTime };
+    }
+  }
+  if (current) result.push(current);
+  return result;
 }
 
 export const Chart = memo(function Chart({ data, height = 400, supply, marketCap, currentPrice, range }: ChartProps) {
@@ -171,9 +201,6 @@ export const Chart = memo(function Chart({ data, height = 400, supply, marketCap
   const prevDataLenRef = useRef<number>(0);
   const prevLastTimeRef = useRef<number>(0);
   const prevChartModeRef = useRef<ChartMode>("price");
-  const microTickRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const lastRealBarRef = useRef<OHLCVBar | null>(null);
-  const mcapMultiplierRef = useRef<number>(0);
   const [chartError, setChartError] = useState<string | null>(null);
   const [activeIndicators, setActiveIndicators] = useState<Set<IndicatorKey>>(new Set());
   const [showIndicatorPanel, setShowIndicatorPanel] = useState(false);
@@ -346,7 +373,7 @@ export const Chart = memo(function Chart({ data, height = 400, supply, marketCap
     const volumeSeries = volumeSeriesRef.current;
     if (!priceChart || !candleSeries || !volumeSeries) return;
 
-    const filtered = dedupAndSort(data);
+    const filtered = aggregateCandles(data, range);
     if (filtered.length === 0) return;
 
     // Compute MCap multiplier: prefer supply, fall back to marketCap/currentPrice
@@ -363,10 +390,6 @@ export const Chart = memo(function Chart({ data, height = 400, supply, marketCap
       : filtered;
 
     setChartError(null);
-
-    // Store last real bar and multiplier for micro-tick generation
-    lastRealBarRef.current = filtered[filtered.length - 1];
-    mcapMultiplierRef.current = mcapMultiplier;
 
     const lastBar = displayData[displayData.length - 1];
     const modeChanged = chartMode !== prevChartModeRef.current;
@@ -447,7 +470,7 @@ export const Chart = memo(function Chart({ data, height = 400, supply, marketCap
 
     // Build indicator key to detect changes
     const indicatorKey = Array.from(activeIndicators).sort().join(",");
-    const dataKey = `${indicatorKey}-${chartMode}-${mcapMultiplier}`;
+    const dataKey = `${indicatorKey}-${chartMode}-${mcapMultiplier}-${range}`;
 
     // Remove old overlay series if indicator set changed
     if (chartCreatedForRef.current !== dataKey) {
@@ -543,45 +566,9 @@ export const Chart = memo(function Chart({ data, height = 400, supply, marketCap
         allCharts.forEach((c) => c.timeScale().applyOptions({ barSpacing: 10, rightOffset: 5 }));
       }
     }
-  }, [data, chartMode, supply, marketCap, currentPrice, activeIndicators]);
+  }, [data, chartMode, supply, marketCap, currentPrice, activeIndicators, range]);
 
-  // ── MICRO-TICK: synthetic small movements between real updates for real-time feel ──
-  useEffect(() => {
-    // Clear any existing micro-tick interval
-    if (microTickRef.current) { clearInterval(microTickRef.current); microTickRef.current = null; }
-
-    const candleSeries = candleSeriesRef.current;
-    if (!candleSeries || !lastRealBarRef.current) return;
-
-    microTickRef.current = setInterval(() => {
-      const realBar = lastRealBarRef.current;
-      if (!realBar || !candleSeriesRef.current) return;
-
-      const mult = chartMode === "mcap" && mcapMultiplierRef.current > 0 ? mcapMultiplierRef.current : 1;
-      const baseClose = realBar.close * mult;
-      // Random walk: ±0.15% of the close
-      const jitter = baseClose * (Math.random() - 0.5) * 0.003;
-      const fakeClose = baseClose + jitter;
-      const fakeHigh = Math.max(realBar.high * mult, fakeClose);
-      const fakeLow = Math.min(realBar.low * mult, fakeClose);
-
-      try {
-        candleSeriesRef.current!.update({
-          time: realBar.time as Time,
-          open: realBar.open * mult,
-          high: fakeHigh,
-          low: fakeLow,
-          close: fakeClose,
-        });
-      } catch {}
-    }, 300);
-
-    return () => {
-      if (microTickRef.current) { clearInterval(microTickRef.current); microTickRef.current = null; }
-    };
-  }, [data, chartMode]);
-
-  const filtered = useMemo(() => dedupAndSort(data), [data]);
+  const filtered = useMemo(() => aggregateCandles(data, range), [data, range]);
   if (filtered.length === 0 && !chartError) {
     return (
       <div className="w-full rounded-lg overflow-hidden bg-[#0b0e11] flex items-center justify-center" style={{ height: height + volumeHeight + 28 }}>
