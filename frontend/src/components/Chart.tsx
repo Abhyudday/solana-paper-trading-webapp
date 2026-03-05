@@ -236,19 +236,19 @@ export const Chart = memo(function Chart({ data, height = 400, supply, marketCap
 
     const chartOptions = {
       layout: {
-        background: { color: "#0b0e11" },
-        textColor: "#505258",
+        background: { color: "#0a0a0f" },
+        textColor: "#44445a",
         fontFamily: "'Inter', system-ui, sans-serif",
         fontSize: 11,
       },
       grid: {
-        vertLines: { color: "rgba(30,33,40,0.5)" },
-        horzLines: { color: "rgba(30,33,40,0.5)" },
+        vertLines: { color: "rgba(26,26,46,0.5)" },
+        horzLines: { color: "rgba(26,26,46,0.5)" },
       },
       crosshair: {
         mode: 0 as const,
-        vertLine: { color: "rgba(0,200,83,0.3)", width: 1 as const, style: 2 as const, labelBackgroundColor: "#00c853" },
-        horzLine: { color: "rgba(0,200,83,0.3)", width: 1 as const, style: 2 as const, labelBackgroundColor: "#00c853" },
+        vertLine: { color: "rgba(0,255,136,0.2)", width: 1 as const, style: 2 as const, labelBackgroundColor: "#00ff88" },
+        horzLine: { color: "rgba(0,255,136,0.2)", width: 1 as const, style: 2 as const, labelBackgroundColor: "#00ff88" },
       },
     };
 
@@ -256,24 +256,24 @@ export const Chart = memo(function Chart({ data, height = 400, supply, marketCap
     const priceChart = createChart(priceContainerRef.current!, {
       ...chartOptions,
       height,
-      rightPriceScale: { borderColor: "#1e2128", scaleMargins: { top: 0.05, bottom: 0.05 } },
-      timeScale: { borderColor: "#1e2128", timeVisible: true, secondsVisible: false, rightOffset: 3, minBarSpacing: 2 },
+      rightPriceScale: { borderColor: "#1a1a2e", scaleMargins: { top: 0.05, bottom: 0.05 } },
+      timeScale: { borderColor: "#1a1a2e", timeVisible: true, secondsVisible: false, rightOffset: 3, minBarSpacing: 2 },
       handleScroll: { mouseWheel: true, pressedMouseMove: true, horzTouchDrag: true, vertTouchDrag: true },
       handleScale: { axisPressedMouseMove: true, mouseWheel: true, pinch: true },
       kineticScroll: { mouse: true, touch: true },
     });
     const candleSeries = priceChart.addCandlestickSeries({
-      upColor: "#00c853", downColor: "#ff3b3b",
-      borderDownColor: "#ff3b3b", borderUpColor: "#00c853",
-      wickDownColor: "#ff3b3b99", wickUpColor: "#00c85399",
+      upColor: "#00ff88", downColor: "#ff3860",
+      borderDownColor: "#ff3860", borderUpColor: "#00ff88",
+      wickDownColor: "#ff386099", wickUpColor: "#00ff8899",
     });
 
     // --- Volume chart ---
     const volChart = createChart(volumeContainerRef.current!, {
       ...chartOptions,
       height: volumeHeight,
-      rightPriceScale: { borderColor: "#1e2128", scaleMargins: { top: 0.1, bottom: 0 } },
-      timeScale: { borderColor: "#1e2128", timeVisible: true, secondsVisible: false, visible: !hasRSI && !hasMACD },
+      rightPriceScale: { borderColor: "#1a1a2e", scaleMargins: { top: 0.1, bottom: 0 } },
+      timeScale: { borderColor: "#1a1a2e", timeVisible: true, secondsVisible: false, visible: !hasRSI && !hasMACD },
     });
     const volumeSeries = volChart.addHistogramSeries({ priceFormat: { type: "volume" }, priceScaleId: "right" });
 
@@ -283,8 +283,8 @@ export const Chart = memo(function Chart({ data, height = 400, supply, marketCap
     if (hasRSI && rsiContainerRef.current) {
       rsiChart = createChart(rsiContainerRef.current, {
         ...chartOptions, height: oscillatorHeight,
-        rightPriceScale: { borderColor: "#1e2128", scaleMargins: { top: 0.05, bottom: 0.05 } },
-        timeScale: { borderColor: "#1e2128", timeVisible: true, secondsVisible: false, visible: !hasMACD },
+        rightPriceScale: { borderColor: "#1a1a2e", scaleMargins: { top: 0.05, bottom: 0.05 } },
+        timeScale: { borderColor: "#1a1a2e", timeVisible: true, secondsVisible: false, visible: !hasMACD },
       });
       const rsi = rsiChart.addLineSeries({ color: "#ff9800", lineWidth: 2, priceLineVisible: false, lastValueVisible: true });
       const ob = rsiChart.addLineSeries({ color: "rgba(255,59,59,0.3)", lineWidth: 1, priceLineVisible: false, lastValueVisible: false, lineStyle: 2 });
@@ -298,8 +298,8 @@ export const Chart = memo(function Chart({ data, height = 400, supply, marketCap
     if (hasMACD && macdContainerRef.current) {
       macdChart = createChart(macdContainerRef.current, {
         ...chartOptions, height: oscillatorHeight,
-        rightPriceScale: { borderColor: "#1e2128", scaleMargins: { top: 0.1, bottom: 0.1 } },
-        timeScale: { borderColor: "#1e2128", timeVisible: true, secondsVisible: false, visible: true },
+        rightPriceScale: { borderColor: "#1a1a2e", scaleMargins: { top: 0.1, bottom: 0.1 } },
+        timeScale: { borderColor: "#1a1a2e", timeVisible: true, secondsVisible: false, visible: true },
       });
       const line = macdChart.addLineSeries({ color: "#e040fb", lineWidth: 2, priceLineVisible: false, lastValueVisible: true });
       const signal = macdChart.addLineSeries({ color: "#ff9800", lineWidth: 1, priceLineVisible: false, lastValueVisible: false });
@@ -410,7 +410,7 @@ export const Chart = memo(function Chart({ data, height = 400, supply, marketCap
       };
       const volBar: HistogramData<Time> = {
         time: lastBar.time as Time, value: lastBar.volume,
-        color: lastBar.close >= lastBar.open ? "rgba(0,200,83,0.55)" : "rgba(255,59,59,0.55)",
+        color: lastBar.close >= lastBar.open ? "rgba(0,255,136,0.45)" : "rgba(255,56,96,0.45)",
       };
       candleSeries.update(candleBar);
       volumeSeries.update(volBar);
@@ -424,7 +424,7 @@ export const Chart = memo(function Chart({ data, height = 400, supply, marketCap
       };
       const volBar: HistogramData<Time> = {
         time: lastBar.time as Time, value: lastBar.volume,
-        color: lastBar.close >= lastBar.open ? "rgba(0,200,83,0.55)" : "rgba(255,59,59,0.55)",
+        color: lastBar.close >= lastBar.open ? "rgba(0,255,136,0.45)" : "rgba(255,56,96,0.45)",
       };
       candleSeries.update(candleBar);
       volumeSeries.update(volBar);
@@ -463,7 +463,7 @@ export const Chart = memo(function Chart({ data, height = 400, supply, marketCap
     }));
     const volumeData: HistogramData<Time>[] = displayData.map((bar) => ({
       time: bar.time as Time, value: bar.volume,
-      color: bar.close >= bar.open ? "rgba(0,200,83,0.55)" : "rgba(255,59,59,0.55)",
+      color: bar.close >= bar.open ? "rgba(0,255,136,0.45)" : "rgba(255,56,96,0.45)",
     }));
     candleSeries.setData(mapped);
     volumeSeries.setData(volumeData);
@@ -544,7 +544,7 @@ export const Chart = memo(function Chart({ data, height = 400, supply, marketCap
         if (macdCalc.macd[i] === null) continue;
         mld.push({ time: times[i], value: macdCalc.macd[i]! });
         if (macdCalc.signal[vi] !== null) sld.push({ time: times[i], value: macdCalc.signal[vi]! });
-        if (macdCalc.histogram[vi] !== null) hld.push({ time: times[i], value: macdCalc.histogram[vi]!, color: macdCalc.histogram[vi]! >= 0 ? "rgba(0,200,83,0.5)" : "rgba(255,59,59,0.5)" });
+        if (macdCalc.histogram[vi] !== null) hld.push({ time: times[i], value: macdCalc.histogram[vi]!, color: macdCalc.histogram[vi]! >= 0 ? "rgba(0,255,136,0.4)" : "rgba(255,56,96,0.4)" });
         vi++;
       }
       macdSeriesRef.current.line.setData(mld);
@@ -571,12 +571,12 @@ export const Chart = memo(function Chart({ data, height = 400, supply, marketCap
   const filtered = useMemo(() => aggregateCandles(data, range), [data, range]);
   if (filtered.length === 0 && !chartError) {
     return (
-      <div className="w-full rounded-lg overflow-hidden bg-[#0b0e11] flex items-center justify-center" style={{ height: height + volumeHeight + 28 }}>
+      <div className="w-full rounded-lg overflow-hidden bg-[#0a0a0f] flex items-center justify-center" style={{ height: height + volumeHeight + 28 }}>
         <div className="flex flex-col items-center gap-2 text-text-muted">
-          <svg className="w-8 h-8 opacity-30" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+          <svg className="w-8 h-8 opacity-20" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z" />
           </svg>
-          <span className="text-xs">No chart data available</span>
+          <span className="text-[11px]">No chart data available</span>
         </div>
       </div>
     );
@@ -584,12 +584,12 @@ export const Chart = memo(function Chart({ data, height = 400, supply, marketCap
 
   if (chartError) {
     return (
-      <div className="w-full rounded-lg overflow-hidden bg-[#0b0e11] flex items-center justify-center" style={{ height: height + volumeHeight + 28 }}>
+      <div className="w-full rounded-lg overflow-hidden bg-[#0a0a0f] flex items-center justify-center" style={{ height: height + volumeHeight + 28 }}>
         <div className="flex flex-col items-center gap-2 text-accent-red/70">
-          <svg className="w-8 h-8 opacity-50" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+          <svg className="w-8 h-8 opacity-40" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
           </svg>
-          <span className="text-xs">{chartError}</span>
+          <span className="text-[11px]">{chartError}</span>
         </div>
       </div>
     );
@@ -598,25 +598,25 @@ export const Chart = memo(function Chart({ data, height = 400, supply, marketCap
   return (
     <div className="w-full rounded-lg overflow-hidden chart-fade-in" role="img" aria-label="Token price chart">
       {/* Indicator toolbar */}
-      <div className="flex items-center gap-1 px-2 py-1 bg-[#0b0e11] border-b border-[#1e2128]/50">
+      <div className="flex items-center gap-1 px-2 py-1 bg-[#0a0a0f] border-b border-[#1a1a2e]/50">
         {/* Price / MCap toggle */}
-        <div className="flex items-center rounded-md bg-[#1a1d23] border border-[#1e2128] mr-2">
+        <div className="flex items-center rounded-lg bg-[#15151e] border border-[#1a1a2e] mr-2">
           <button
             onClick={() => setChartMode("price")}
-            className={`px-3 py-1 rounded-md text-[11px] font-bold tracking-wide transition-all ${
+            className={`px-3 py-1 rounded-lg text-[10px] font-bold tracking-wide transition-all ${
               chartMode === "price"
-                ? "bg-accent-green/20 text-accent-green shadow-sm shadow-accent-green/10"
-                : "text-[#505258] hover:text-text-secondary"
+                ? "bg-accent-green/10 text-accent-green shadow-sm"
+                : "text-[#44445a] hover:text-text-secondary"
             }`}
           >
             Price
           </button>
           <button
             onClick={() => setChartMode("mcap")}
-            className={`px-3 py-1 rounded-md text-[11px] font-bold tracking-wide transition-all ${
+            className={`px-3 py-1 rounded-lg text-[10px] font-bold tracking-wide transition-all ${
               chartMode === "mcap"
-                ? "bg-[#f59e0b]/20 text-[#f59e0b] shadow-sm shadow-[#f59e0b]/10"
-                : "text-[#505258] hover:text-text-secondary"
+                ? "bg-accent-yellow/10 text-accent-yellow shadow-sm"
+                : "text-[#44445a] hover:text-text-secondary"
             }`}
             title={!supply ? "Supply data needed for MCap chart" : undefined}
           >
@@ -624,14 +624,14 @@ export const Chart = memo(function Chart({ data, height = 400, supply, marketCap
           </button>
         </div>
         {chartMode === "mcap" && (
-          <span className="text-[9px] font-semibold text-[#f59e0b] bg-[#f59e0b]/10 px-2 py-0.5 rounded-full mr-1 animate-pulse">
-            Market Cap View
+          <span className="text-[8px] font-bold text-accent-yellow bg-accent-yellow/10 px-2 py-0.5 rounded-md mr-1 border border-accent-yellow/20 uppercase tracking-wider">
+            MCap View
           </span>
         )}
         <button
           onClick={() => setShowIndicatorPanel(!showIndicatorPanel)}
-          className={`flex items-center gap-1 px-2 py-0.5 rounded text-[9px] font-semibold transition-colors ${
-            showIndicatorPanel ? "bg-accent-blue/15 text-accent-blue" : "text-[#505258] hover:text-text-secondary hover:bg-[#1a1d23]"
+          className={`flex items-center gap-1 px-2 py-0.5 rounded-lg text-[9px] font-bold transition-all ${
+            showIndicatorPanel ? "bg-accent-blue/10 text-accent-blue border border-accent-blue/20" : "text-[#44445a] hover:text-text-secondary hover:bg-[#15151e]"
           }`}
         >
           <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -639,14 +639,13 @@ export const Chart = memo(function Chart({ data, height = 400, supply, marketCap
           </svg>
           Indicators
           {activeIndicators.size > 0 && (
-            <span className="bg-accent-blue/20 text-accent-blue px-1 rounded text-[8px]">{activeIndicators.size}</span>
+            <span className="bg-accent-blue/10 text-accent-blue px-1.5 rounded-md text-[7px] font-bold">{activeIndicators.size}</span>
           )}
         </button>
-        {/* Active indicator pills */}
         {Array.from(activeIndicators).map((key) => {
           const ind = INDICATORS.find((i) => i.key === key)!;
           return (
-            <span key={key} className="flex items-center gap-1 px-1.5 py-0.5 rounded text-[8px] font-semibold bg-[#1a1d23]">
+            <span key={key} className="flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[8px] font-bold bg-[#15151e] border border-[#1a1a2e]">
               <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: ind.color }} />
               <span style={{ color: ind.color }}>{ind.label}</span>
               <button onClick={() => toggleIndicator(key)} className="text-text-muted hover:text-text-primary ml-0.5">&times;</button>
@@ -657,7 +656,7 @@ export const Chart = memo(function Chart({ data, height = 400, supply, marketCap
 
       {/* Indicator selection panel */}
       {showIndicatorPanel && (
-        <div className="px-3 py-2 bg-[#111418] border-b border-[#1e2128]/50">
+        <div className="px-3 py-2 bg-[#0e0e14] border-b border-[#1a1a2e]/50">
           <div className="grid grid-cols-2 gap-x-6 gap-y-1">
             <div>
               <span className="text-[8px] text-text-muted uppercase tracking-wider font-semibold">Overlays</span>
@@ -702,25 +701,25 @@ export const Chart = memo(function Chart({ data, height = 400, supply, marketCap
       )}
 
       <div ref={priceContainerRef} className="w-full" />
-      <div className="flex items-center gap-1.5 px-2 py-1 bg-[#0b0e11]">
-        <span className="text-[9px] font-medium text-[#505258] uppercase tracking-wider">Buy</span>
-        <span className="inline-block w-2 h-2 rounded-sm bg-[#00c853]/60" />
-        <span className="text-[9px] font-medium text-[#505258] uppercase tracking-wider ml-2">Sell</span>
-        <span className="inline-block w-2 h-2 rounded-sm bg-[#ff3b3b]/60" />
+      <div className="flex items-center gap-1.5 px-2 py-1 bg-[#0a0a0f]">
+        <span className="text-[8px] font-bold text-[#44445a] uppercase tracking-wider">Buy</span>
+        <span className="inline-block w-2 h-2 rounded-sm bg-[#00ff88]/50" />
+        <span className="text-[8px] font-bold text-[#44445a] uppercase tracking-wider ml-2">Sell</span>
+        <span className="inline-block w-2 h-2 rounded-sm bg-[#ff3860]/50" />
       </div>
       <div ref={volumeContainerRef} className="w-full" />
       {hasRSI && (
         <div>
-          <div className="flex items-center gap-1.5 px-2 py-0.5 bg-[#0b0e11] border-t border-[#1e2128]/50">
-            <span className="text-[8px] font-semibold text-[#ff9800] uppercase tracking-wider">RSI 14</span>
+          <div className="flex items-center gap-1.5 px-2 py-0.5 bg-[#0a0a0f] border-t border-[#1a1a2e]/50">
+            <span className="text-[8px] font-bold text-[#ff9800] uppercase tracking-wider">RSI 14</span>
           </div>
           <div ref={rsiContainerRef} className="w-full" />
         </div>
       )}
       {hasMACD && (
         <div>
-          <div className="flex items-center gap-1.5 px-2 py-0.5 bg-[#0b0e11] border-t border-[#1e2128]/50">
-            <span className="text-[8px] font-semibold text-[#e040fb] uppercase tracking-wider">MACD (12,26,9)</span>
+          <div className="flex items-center gap-1.5 px-2 py-0.5 bg-[#0a0a0f] border-t border-[#1a1a2e]/50">
+            <span className="text-[8px] font-bold text-[#e040fb] uppercase tracking-wider">MACD (12,26,9)</span>
           </div>
           <div ref={macdContainerRef} className="w-full" />
         </div>

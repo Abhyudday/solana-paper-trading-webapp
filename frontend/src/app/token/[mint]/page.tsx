@@ -23,12 +23,6 @@ const Chart = dynamic(() => import("@/components/Chart").then((m) => m.Chart), {
 
 type ChartRange = "1s" | "5s" | "15s" | "30s" | "1m" | "5m" | "15m" | "30m" | "1h" | "6h" | "1d" | "7d" | "30d";
 
-const TIMEFRAME_GROUPS: { label: string; ranges: ChartRange[] }[] = [
-  { label: "Seconds", ranges: ["1s", "5s", "15s", "30s"] },
-  { label: "Minutes", ranges: ["1m", "5m", "15m", "30m"] },
-  { label: "Hours+", ranges: ["1h", "6h", "1d", "7d", "30d"] },
-];
-
 const ALL_RANGES: ChartRange[] = ["1s", "5s", "15s", "30s", "1m", "5m", "15m", "30m", "1h", "6h", "1d", "7d", "30d"];
 
 type InfoTab = "info" | "holders" | "bundles";
@@ -51,7 +45,6 @@ export default function TokenPage() {
     placeholderData: keepPreviousData,
   });
 
-  // Dynamic refetch intervals per timeframe
   const isShortRange = ["1s", "5s", "15s", "30s", "1m"].includes(range);
   const chartRefetchInterval = (() => {
     switch (range) {
@@ -76,7 +69,6 @@ export default function TokenPage() {
     retry: 2,
   });
 
-  // Fallback: if current range returns no bars, try a longer timeframe automatically
   const fallbackRange = range === "15s" ? "1m" : range === "1m" ? "5m" : range === "5m" ? "15m" : null;
   const { data: fallbackChartData } = useQuery({
     queryKey: ["chart", mint, fallbackRange],
@@ -86,7 +78,6 @@ export default function TokenPage() {
     placeholderData: keepPreviousData,
   });
 
-  // Track last chart update time for LIVE indicator
   const lastUpdateRef = useRef<number>(Date.now());
   const [lastUpdated, setLastUpdated] = useState<number>(Date.now());
   useEffect(() => {
@@ -104,7 +95,6 @@ export default function TokenPage() {
     staleTime: 10_000,
   });
 
-  // Prefetch trades, holders, bundles in parallel with token info
   useEffect(() => {
     if (mint) {
       queryClient.prefetchQuery({
@@ -127,7 +117,6 @@ export default function TokenPage() {
     }
   }, [mint, queryClient]);
 
-  // Prefetch adjacent timeframes for instant switching
   useEffect(() => {
     if (!mint) return;
     const idx = ALL_RANGES.indexOf(range);
@@ -141,11 +130,9 @@ export default function TokenPage() {
     });
   }, [mint, range, queryClient]);
 
-  // Real-time: patch last candle or create new one based on timeframe bucket
   useEffect(() => {
     if (!mint) return;
 
-    // Convert range to bucket duration in seconds
     const bucketMap: Record<string, number> = {
       "1s": 1, "5s": 5, "15s": 15, "30s": 30,
       "1m": 60, "5m": 300, "15m": 900, "30m": 1800,
@@ -167,14 +154,12 @@ export default function TokenPage() {
         const lastBucket = Math.floor(last.time / bucketSec) * bucketSec;
 
         if (currentBucket === lastBucket) {
-          // Same time bucket — update high, low, close in place
           const patched = { ...last };
           patched.close = price;
           if (price > patched.high) patched.high = price;
           if (price < patched.low || patched.low === 0) patched.low = price;
           updated[updated.length - 1] = patched;
         } else {
-          // New time bucket — create a new candle
           updated.push({
             time: currentBucket,
             open: price,
@@ -204,48 +189,49 @@ export default function TokenPage() {
   const chartBars = primaryBars.length > 0 ? primaryBars : (fallbackChartData?.bars ?? []);
   const usingFallback = primaryBars.length === 0 && chartBars.length > 0;
 
-  // Token not found — only after fetch completes with no data
   if (!tokenInfo && tokenFetched && !tokenLoading) {
     return (
       <div className="flex items-center justify-center h-96">
-        <div className="text-text-muted text-sm">Token not found</div>
+        <div className="flex flex-col items-center gap-3">
+          <div className="h-12 w-12 rounded-xl bg-bg-tertiary flex items-center justify-center">
+            <svg className="w-6 h-6 text-text-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
+            </svg>
+          </div>
+          <div className="text-text-muted text-sm">Token not found</div>
+        </div>
       </div>
     );
   }
 
-  // Show skeleton while loading (instead of blank page)
   const isLoading = !tokenInfo && tokenLoading;
 
   if (isLoading) {
     return (
-      <div className="pt-2 pb-6">
-        {/* Skeleton Header */}
-        <div className="flex items-center gap-3 mb-2 pb-2 border-b border-border">
-          <div className="flex items-center gap-2">
-            <div className="h-8 w-8 rounded-full bg-bg-tertiary animate-pulse ring-1 ring-border" />
-            <div>
-              <div className="h-4 w-24 bg-bg-tertiary rounded animate-pulse mb-1" />
-              <div className="h-3 w-32 bg-bg-tertiary rounded animate-pulse" />
-            </div>
+      <div className="pt-3 pb-6 page-enter">
+        <div className="flex items-center gap-3 mb-3 pb-3 border-b border-border">
+          <div className="h-9 w-9 rounded-xl skeleton-shimmer ring-1 ring-border" />
+          <div>
+            <div className="h-4 w-24 skeleton-shimmer rounded mb-1" />
+            <div className="h-3 w-36 skeleton-shimmer rounded" />
           </div>
           <div className="flex items-center gap-4 ml-auto">
             {Array.from({ length: 5 }).map((_, i) => (
               <div key={i} className="flex flex-col items-center gap-1">
-                <div className="h-2.5 w-8 bg-bg-tertiary rounded animate-pulse" />
-                <div className="h-3 w-12 bg-bg-tertiary rounded animate-pulse" />
+                <div className="h-2.5 w-8 skeleton-shimmer rounded" />
+                <div className="h-3.5 w-14 skeleton-shimmer rounded" />
               </div>
             ))}
           </div>
         </div>
-        {/* Skeleton Body */}
-        <div className="grid grid-cols-1 lg:grid-cols-[1fr_300px] gap-2">
-          <div className="flex flex-col gap-2">
-            <div className="rounded border border-border bg-bg-primary h-[460px] animate-pulse" />
-            <div className="rounded border border-border bg-bg-card h-[300px] animate-pulse" />
+        <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-3">
+          <div className="flex flex-col gap-3">
+            <div className="rounded-xl border border-border bg-bg-card h-[480px] skeleton-shimmer" />
+            <div className="rounded-xl border border-border bg-bg-card h-[300px] skeleton-shimmer" />
           </div>
-          <div className="flex flex-col gap-2">
-            <div className="rounded border border-border bg-bg-card h-[280px] animate-pulse" />
-            <div className="rounded border border-border bg-bg-card h-[200px] animate-pulse" />
+          <div className="flex flex-col gap-3">
+            <div className="rounded-xl border border-border bg-bg-card h-[300px] skeleton-shimmer" />
+            <div className="rounded-xl border border-border bg-bg-card h-[220px] skeleton-shimmer" />
           </div>
         </div>
       </div>
@@ -255,30 +241,29 @@ export default function TokenPage() {
   const t = tokenInfo!;
 
   return (
-    <div className="pt-2 pb-6">
+    <div className="pt-3 pb-6 page-enter">
       {/* Token Header Bar */}
-      <div className="flex flex-wrap items-center gap-3 mb-2 pb-2 border-b border-border">
-        {/* Token identity */}
-        <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center gap-3 mb-3 pb-3 border-b border-border">
+        <div className="flex items-center gap-2.5">
           {t.image ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
               src={t.image}
               alt={t.symbol}
-              className="h-8 w-8 rounded-full object-cover ring-1 ring-border"
+              className="h-9 w-9 rounded-xl object-cover ring-1 ring-border"
               onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
             />
           ) : (
-            <div className="h-8 w-8 rounded-full bg-bg-tertiary flex items-center justify-center text-xs font-bold text-text-muted ring-1 ring-border">
+            <div className="h-9 w-9 rounded-xl bg-gradient-to-br from-accent-green/20 to-accent-blue/10 flex items-center justify-center text-sm font-bold text-accent-green/60 ring-1 ring-border">
               {t.symbol?.charAt(0)}
             </div>
           )}
           <div>
-            <div className="flex items-center gap-1.5">
-              <span className="font-bold text-sm">{t.symbol}</span>
-              <span className="text-[10px] text-text-muted">{t.name}</span>
+            <div className="flex items-center gap-2">
+              <span className="font-bold text-[15px]">{t.symbol}</span>
+              <span className="text-[11px] text-text-muted">{t.name}</span>
             </div>
-            <span className="flex items-center gap-1">
+            <span className="flex items-center gap-1.5">
               <button
                 onClick={handleCopyMint}
                 className={`text-[9px] font-mono transition-colors ${mintCopied ? "text-accent-green" : "text-text-muted hover:text-text-primary"}`}
@@ -307,34 +292,39 @@ export default function TokenPage() {
           </div>
         </div>
 
-        {/* Social Links */}
         <SocialLinks socials={t.socials} mint={mint} />
 
-        {/* Stats bar — MCap highlighted */}
-        <div className="flex items-center gap-4 ml-auto">
+        {/* Stats bar */}
+        <div className="flex items-center gap-3 ml-auto">
           <StatItem label="MCap" value={formatCompact(t.marketCap)} highlight />
+          <div className="w-px h-6 bg-border" />
           <StatItem label="Price" value={formatPrice(t.price)} />
+          <div className="w-px h-6 bg-border" />
           <StatItem label="Liq" value={formatCompact(t.liquidity)} />
+          <div className="w-px h-6 bg-border" />
           <StatItem label="24h Vol" value={formatCompact(t.volume24h || 0)} />
-          <StatItem label="Supply" value={formatNumber(t.supply, 0)} />
+          <div className="w-px h-6 bg-border hidden md:block" />
+          <div className="hidden md:block">
+            <StatItem label="Supply" value={formatNumber(t.supply, 0)} />
+          </div>
         </div>
       </div>
 
-      {/* Main Grid: Chart + Order Panel */}
-      <div className="grid grid-cols-1 lg:grid-cols-[1fr_300px] gap-2">
-        {/* Left: Chart area */}
-        <div className="flex flex-col gap-2">
+      {/* Main Grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-3">
+        {/* Left: Chart + Trades */}
+        <div className="flex flex-col gap-3">
           {/* Chart */}
-          <div className="rounded border border-border bg-bg-primary overflow-hidden">
-            {/* Timeframe bar — all granular options */}
-            <div className="flex items-center gap-0.5 px-2 py-1.5 border-b border-border bg-bg-secondary overflow-x-auto scrollbar-thin">
+          <div className="rounded-xl border border-border bg-bg-card overflow-hidden">
+            {/* Timeframe bar */}
+            <div className="flex items-center gap-0.5 px-3 py-2 border-b border-border bg-bg-secondary overflow-x-auto">
               {ALL_RANGES.map((r) => (
                 <button
                   key={r}
                   onClick={() => setRange(r)}
-                  className={`px-2 py-1 rounded text-[10px] font-bold transition-colors whitespace-nowrap ${
+                  className={`px-2.5 py-1 rounded-lg text-[10px] font-bold transition-all whitespace-nowrap ${
                     range === r
-                      ? "bg-accent-green/20 text-accent-green"
+                      ? "bg-accent-green/10 text-accent-green border border-accent-green/20 shadow-glow-sm"
                       : "text-text-muted hover:text-text-primary hover:bg-bg-tertiary"
                   }`}
                   aria-pressed={range === r}
@@ -342,15 +332,12 @@ export default function TokenPage() {
                   {r.toUpperCase()}
                 </button>
               ))}
-              <div className="ml-auto flex items-center gap-2 text-[10px] text-text-muted flex-shrink-0 pl-2">
+              <div className="ml-auto flex items-center gap-2 text-[10px] text-text-muted flex-shrink-0 pl-3">
                 {isShortRange && (
                   <span className="flex items-center gap-1.5 font-medium">
-                    <span className="relative flex h-2 w-2">
-                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-accent-green opacity-75" />
-                      <span className="relative inline-flex rounded-full h-2 w-2 bg-accent-green" />
-                    </span>
-                    <span className="text-accent-green">LIVE</span>
-                    <span className="text-text-muted/60 text-[9px] font-mono">
+                    <span className="h-1.5 w-1.5 rounded-full bg-accent-green live-dot" />
+                    <span className="text-accent-green font-bold text-[9px] uppercase">Live</span>
+                    <span className="text-text-muted/50 text-[8px] font-mono">
                       {new Date(lastUpdated).toLocaleTimeString()}
                     </span>
                   </span>
@@ -358,25 +345,25 @@ export default function TokenPage() {
               </div>
             </div>
             {chartLoading && chartBars.length === 0 ? (
-              <div className="flex flex-col items-center justify-center h-[380px] text-text-muted bg-bg-primary gap-3">
+              <div className="flex flex-col items-center justify-center h-[400px] text-text-muted bg-bg-card gap-3">
                 <div className="w-6 h-6 border-2 border-text-muted/30 border-t-accent-green rounded-full animate-spin" />
-                <span className="text-xs">Loading chart data...</span>
+                <span className="text-[11px]">Loading chart data...</span>
               </div>
             ) : chartBars.length > 0 ? (
               <>
                 {usingFallback && (
-                  <div className="px-2 py-1 bg-[#f59e0b]/10 text-[#f59e0b] text-[10px] font-medium text-center">
+                  <div className="px-3 py-1.5 bg-accent-orange/5 border-b border-accent-orange/10 text-accent-orange text-[10px] font-semibold text-center">
                     No data for {range.toUpperCase()} — showing {fallbackRange?.toUpperCase()} instead
                   </div>
                 )}
-                <Chart data={chartBars} height={380} supply={t.supply} marketCap={t.marketCap} currentPrice={t.price} range={usingFallback ? fallbackRange! : range} />
+                <Chart data={chartBars} height={400} supply={t.supply} marketCap={t.marketCap} currentPrice={t.price} range={usingFallback ? fallbackRange! : range} />
               </>
             ) : (
-              <div className="flex flex-col items-center justify-center h-[380px] text-text-muted bg-bg-primary gap-2">
-                <svg className="w-8 h-8 opacity-30" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+              <div className="flex flex-col items-center justify-center h-[400px] text-text-muted bg-bg-card gap-2">
+                <svg className="w-8 h-8 opacity-20" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z" />
                 </svg>
-                <span className="text-xs">No chart data available for this timeframe</span>
+                <span className="text-[11px]">No chart data available for this timeframe</span>
               </div>
             )}
           </div>
@@ -386,61 +373,63 @@ export default function TokenPage() {
         </div>
 
         {/* Right: Order Panel + Tabbed Info */}
-        <div className="flex flex-col gap-2">
+        <div className="flex flex-col gap-3">
           <OrderPanel token={t} usdcBalance={usdcBalance} tokenQty={tokenQty} />
 
-          {/* Tabbed info section: Token Info / Holders / Bundles */}
-          <div className="rounded border border-border bg-bg-card overflow-hidden">
+          {/* Tabbed info section */}
+          <div className="rounded-xl border border-border bg-bg-card overflow-hidden">
             <div className="flex border-b border-border bg-bg-secondary">
               {(["info", "holders", "bundles"] as InfoTab[]).map((tab) => (
                 <button
                   key={tab}
                   onClick={() => setInfoTab(tab)}
-                  className={`flex-1 py-1.5 text-[10px] font-semibold uppercase tracking-wider transition-colors relative ${
+                  className={`flex-1 py-2 text-[10px] font-bold uppercase tracking-wider transition-all relative ${
                     infoTab === tab
-                      ? "text-accent-green border-b-2 border-accent-green bg-bg-card"
+                      ? "text-accent-green bg-bg-card"
                       : "text-text-muted hover:text-text-secondary"
                   }`}
                 >
-                  {tab === "info" ? "Info" : tab === "holders" ? "Holders" : "Bundles & Snipers"}
+                  {tab === "info" ? "Info" : tab === "holders" ? "Holders" : "Bundles"}
+                  {infoTab === tab && (
+                    <div className="absolute bottom-0 left-0 right-0 h-[2px] bg-accent-green" />
+                  )}
                 </button>
               ))}
             </div>
 
             {infoTab === "info" && (
               <div className="p-3">
-                <div className="grid grid-cols-2 gap-2 text-[10px]">
-                  <div>
-                    <span className="text-text-muted">Mint</span>
+                <div className="grid grid-cols-2 gap-2.5 text-[10px]">
+                  <div className="bg-bg-tertiary/30 rounded-lg p-2">
+                    <span className="text-text-muted block text-[8px] uppercase tracking-wider mb-0.5">Mint</span>
                     <div className="font-mono text-text-secondary truncate" title={t.mint}>{shortenAddress(t.mint, 6)}</div>
                   </div>
-                  <div>
-                    <span className="text-text-muted">Decimals</span>
+                  <div className="bg-bg-tertiary/30 rounded-lg p-2">
+                    <span className="text-text-muted block text-[8px] uppercase tracking-wider mb-0.5">Decimals</span>
                     <div className="text-text-secondary">{t.decimals}</div>
                   </div>
-                  <div>
-                    <span className="text-text-muted">Supply</span>
+                  <div className="bg-bg-tertiary/30 rounded-lg p-2">
+                    <span className="text-text-muted block text-[8px] uppercase tracking-wider mb-0.5">Supply</span>
                     <div className="text-text-secondary">{formatNumber(t.supply, 0)}</div>
                   </div>
-                  <div>
-                    <span className="text-text-muted">Liquidity</span>
+                  <div className="bg-bg-tertiary/30 rounded-lg p-2">
+                    <span className="text-text-muted block text-[8px] uppercase tracking-wider mb-0.5">Liquidity</span>
                     <div className="text-text-secondary">{formatCompact(t.liquidity)}</div>
                   </div>
-                  <div>
-                    <span className="text-text-muted">Market Cap</span>
+                  <div className="bg-bg-tertiary/30 rounded-lg p-2">
+                    <span className="text-text-muted block text-[8px] uppercase tracking-wider mb-0.5">Market Cap</span>
                     <div className="text-accent-green font-semibold">{formatCompact(t.marketCap)}</div>
                   </div>
-                  <div>
-                    <span className="text-text-muted">24h Volume</span>
+                  <div className="bg-bg-tertiary/30 rounded-lg p-2">
+                    <span className="text-text-muted block text-[8px] uppercase tracking-wider mb-0.5">24h Volume</span>
                     <div className="text-text-secondary">{formatCompact(t.volume24h || 0)}</div>
                   </div>
                 </div>
 
-                {/* Social links in info tab */}
                 {t.socials && Object.keys(t.socials).length > 0 && (
-                  <div className="mt-3 pt-2 border-t border-border/50">
-                    <span className="text-[9px] text-text-muted uppercase tracking-wider">Socials</span>
-                    <div className="mt-1">
+                  <div className="mt-3 pt-2.5 border-t border-border/50">
+                    <span className="text-[8px] text-text-muted uppercase tracking-wider font-semibold">Socials</span>
+                    <div className="mt-1.5">
                       <SocialLinks socials={t.socials} mint={mint} />
                     </div>
                   </div>
@@ -465,8 +454,8 @@ export default function TokenPage() {
 function StatItem({ label, value, highlight }: { label: string; value: string; highlight?: boolean }) {
   return (
     <div className="flex flex-col items-center">
-      <span className="text-[9px] text-text-muted uppercase">{label}</span>
-      <span className={`text-[11px] font-mono font-semibold ${highlight ? "text-accent-green" : "text-text-primary"}`}>
+      <span className="text-[8px] text-text-muted uppercase tracking-wider font-semibold">{label}</span>
+      <span className={`text-[12px] font-mono font-bold ${highlight ? "text-accent-green text-glow-green" : "text-text-primary"}`}>
         {value}
       </span>
     </div>

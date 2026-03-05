@@ -80,15 +80,12 @@ export function FilterPanel({ onApply, onClose, initialFilters, columnType }: Fi
         (filters as Record<string, number>)[field.maxKey] = Number(maxStr) * mult;
       }
     }
-    // Age: user enters minutes — convert to createdAt timestamps
     const ageMin = draft["ageMin"];
     const ageMax = draft["ageMax"];
     if (ageMin !== undefined && ageMin !== "") {
-      // Min age → maxCreatedAt (created no later than X minutes ago)
       filters.maxCreatedAt = Date.now() - Number(ageMin) * 60000;
     }
     if (ageMax !== undefined && ageMax !== "") {
-      // Max age → minCreatedAt (created no earlier than X minutes ago)
       filters.minCreatedAt = Date.now() - Number(ageMax) * 60000;
     }
     onApply(filters);
@@ -102,24 +99,26 @@ export function FilterPanel({ onApply, onClose, initialFilters, columnType }: Fi
   const hasFilters = Object.keys(draft).length > 0;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-      <div className="w-full max-w-md bg-bg-primary border border-border rounded-xl shadow-2xl overflow-hidden">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm">
+      <div className="w-full max-w-md bg-bg-primary border border-border rounded-2xl shadow-2xl overflow-hidden animate-fade-in">
         {/* Header */}
-        <div className="flex items-center justify-between px-5 py-3.5 border-b border-border">
-          <h2 className="text-sm font-bold uppercase tracking-wide text-text-primary">Filters</h2>
+        <div className="flex items-center justify-between px-5 py-4 border-b border-border">
+          <h2 className="text-[13px] font-bold uppercase tracking-wider text-text-primary">Filters</h2>
           <button
             onClick={onClose}
-            className="text-text-muted hover:text-text-primary text-lg leading-none transition-colors"
+            className="text-text-muted hover:text-text-primary h-6 w-6 rounded-lg flex items-center justify-center hover:bg-bg-tertiary transition-all"
           >
-            ✕
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
           </button>
         </div>
 
         {/* Filter fields */}
-        <div className="px-5 py-4 max-h-[60vh] overflow-y-auto scrollbar-thin space-y-3">
-          {/* Age row (special — uses minutes) */}
+        <div className="px-5 py-4 max-h-[60vh] overflow-y-auto space-y-3">
+          {/* Age row */}
           <div className="flex items-center gap-3">
-            <span className="w-24 text-sm text-text-secondary flex-shrink-0">Age</span>
+            <span className="w-20 text-[11px] text-text-secondary flex-shrink-0 font-semibold">Age</span>
             <div className="flex-1 flex gap-2">
               <div className="relative flex-1">
                 <input
@@ -127,9 +126,9 @@ export function FilterPanel({ onApply, onClose, initialFilters, columnType }: Fi
                   placeholder="Min"
                   value={draft["ageMin"] || ""}
                   onChange={(e) => updateField("ageMin", e.target.value)}
-                  className="w-full bg-bg-tertiary border border-border rounded-lg px-3 py-2 text-xs text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent-blue/60 pr-10"
+                  className="w-full bg-bg-input border border-border rounded-lg px-3 py-2 text-[11px] text-text-primary placeholder:text-text-muted/50 focus:outline-none focus:border-accent-green/30 focus:ring-1 focus:ring-accent-green/10 pr-10"
                 />
-                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-text-muted">min</span>
+                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[9px] text-text-muted">min</span>
               </div>
               <div className="relative flex-1">
                 <input
@@ -137,21 +136,20 @@ export function FilterPanel({ onApply, onClose, initialFilters, columnType }: Fi
                   placeholder="Max"
                   value={draft["ageMax"] || ""}
                   onChange={(e) => updateField("ageMax", e.target.value)}
-                  className="w-full bg-bg-tertiary border border-border rounded-lg px-3 py-2 text-xs text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent-blue/60 pr-10"
+                  className="w-full bg-bg-input border border-border rounded-lg px-3 py-2 text-[11px] text-text-primary placeholder:text-text-muted/50 focus:outline-none focus:border-accent-green/30 focus:ring-1 focus:ring-accent-green/10 pr-10"
                 />
-                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-text-muted">min</span>
+                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[9px] text-text-muted">min</span>
               </div>
             </div>
           </div>
 
           {/* Standard filter rows */}
           {FILTER_FIELDS.filter((field) => {
-            // Hide B. Curve filter for migrated (graduated) tokens — they are off bonding curve by definition
             if (columnType === "migrated" && field.label === "B. Curve") return false;
             return true;
           }).map((field) => (
             <div key={field.label} className="flex items-center gap-3">
-              <span className="w-24 text-sm text-text-secondary flex-shrink-0">{field.label}</span>
+              <span className="w-20 text-[11px] text-text-secondary flex-shrink-0 font-semibold">{field.label}</span>
               <div className="flex-1 flex gap-2">
                 <div className="relative flex-1">
                   <input
@@ -159,10 +157,10 @@ export function FilterPanel({ onApply, onClose, initialFilters, columnType }: Fi
                     placeholder="Min"
                     value={draft[field.minKey] || ""}
                     onChange={(e) => updateField(field.minKey, e.target.value)}
-                    className="w-full bg-bg-tertiary border border-border rounded-lg px-3 py-2 text-xs text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent-blue/60 pr-10"
+                    className="w-full bg-bg-input border border-border rounded-lg px-3 py-2 text-[11px] text-text-primary placeholder:text-text-muted/50 focus:outline-none focus:border-accent-green/30 focus:ring-1 focus:ring-accent-green/10 pr-10"
                   />
                   {field.unit && (
-                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-text-muted">
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[9px] text-text-muted">
                       {field.unit}
                     </span>
                   )}
@@ -173,10 +171,10 @@ export function FilterPanel({ onApply, onClose, initialFilters, columnType }: Fi
                     placeholder="Max"
                     value={draft[field.maxKey] || ""}
                     onChange={(e) => updateField(field.maxKey, e.target.value)}
-                    className="w-full bg-bg-tertiary border border-border rounded-lg px-3 py-2 text-xs text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent-blue/60 pr-10"
+                    className="w-full bg-bg-input border border-border rounded-lg px-3 py-2 text-[11px] text-text-primary placeholder:text-text-muted/50 focus:outline-none focus:border-accent-green/30 focus:ring-1 focus:ring-accent-green/10 pr-10"
                   />
                   {field.unit && (
-                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-text-muted">
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[9px] text-text-muted">
                       {field.unit}
                     </span>
                   )}
@@ -190,23 +188,23 @@ export function FilterPanel({ onApply, onClose, initialFilters, columnType }: Fi
         <div className="flex items-center justify-between px-5 py-3.5 border-t border-border">
           <button
             onClick={handleReset}
-            className="text-xs text-text-muted hover:text-text-secondary transition-colors"
+            className="text-[11px] text-text-muted hover:text-accent-red transition-colors font-semibold"
           >
-            Reset
+            Reset All
           </button>
           <div className="flex items-center gap-2">
             <button
               onClick={onClose}
-              className="px-4 py-1.5 rounded-lg text-xs font-medium bg-bg-tertiary text-text-secondary hover:text-text-primary border border-border transition-colors"
+              className="px-4 py-1.5 rounded-lg text-[11px] font-semibold bg-bg-tertiary text-text-secondary hover:text-text-primary border border-border transition-all"
             >
               Cancel
             </button>
             <button
               onClick={handleApply}
-              className={`px-5 py-1.5 rounded-lg text-xs font-bold transition-colors ${
+              className={`px-5 py-1.5 rounded-lg text-[11px] font-bold transition-all ${
                 hasFilters
-                  ? "bg-white text-black hover:bg-gray-200"
-                  : "bg-bg-tertiary text-text-muted"
+                  ? "bg-accent-green text-bg-primary hover:shadow-glow"
+                  : "bg-bg-tertiary text-text-muted border border-border"
               }`}
             >
               Apply

@@ -40,30 +40,6 @@ function DiscordIcon() {
   );
 }
 
-function SolscanIcon() {
-  return (
-    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" />
-    </svg>
-  );
-}
-
-function CopyIcon() {
-  return (
-    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M15.666 3.888A2.25 2.25 0 0013.5 2.25h-3c-1.03 0-1.9.693-2.166 1.638m7.332 0c.055.194.084.4.084.612v0a.75.75 0 01-.75.75H9.75a.75.75 0 01-.75-.75v0c0-.212.03-.418.084-.612m7.332 0c.646.049 1.288.11 1.927.184 1.1.128 1.907 1.077 1.907 2.185V19.5a2.25 2.25 0 01-2.25 2.25H6.75A2.25 2.25 0 014.5 19.5V6.257c0-1.108.806-2.057 1.907-2.185a48.208 48.208 0 011.927-.184" />
-    </svg>
-  );
-}
-
-function CheckIcon() {
-  return (
-    <svg className="w-3.5 h-3.5 text-accent-green" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
-    </svg>
-  );
-}
-
 export function SocialLinks({ socials, mint }: SocialLinksProps) {
   const hasAnySocial = socials && (socials.twitter || socials.telegram || socials.website || socials.discord);
   const [copied, setCopied] = useState(false);
@@ -78,19 +54,27 @@ export function SocialLinks({ socials, mint }: SocialLinksProps) {
     <div className="flex items-center gap-1">
       <button
         onClick={handleCopyMint}
-        className={`p-1.5 rounded bg-bg-tertiary/50 transition-colors ${
-          copied ? "text-accent-green bg-accent-green/10" : "text-text-muted hover:text-text-primary hover:bg-bg-tertiary"
+        className={`p-1.5 rounded-lg border transition-all ${
+          copied ? "text-accent-green bg-accent-green/10 border-accent-green/20" : "text-text-muted hover:text-text-primary hover:bg-bg-tertiary border-border/50"
         }`}
         title={copied ? "Copied!" : "Copy mint address"}
       >
-        {copied ? <CheckIcon /> : <CopyIcon />}
+        {copied ? (
+          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+          </svg>
+        ) : (
+          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M15.666 3.888A2.25 2.25 0 0013.5 2.25h-3c-1.03 0-1.9.693-2.166 1.638m7.332 0c.055.194.084.4.084.612v0a.75.75 0 01-.75.75H9.75a.75.75 0 01-.75-.75v0c0-.212.03-.418.084-.612m7.332 0c.646.049 1.288.11 1.927.184 1.1.128 1.907 1.077 1.907 2.185V19.5a2.25 2.25 0 01-2.25 2.25H6.75A2.25 2.25 0 014.5 19.5V6.257c0-1.108.806-2.057 1.907-2.185a48.208 48.208 0 011.927-.184" />
+          </svg>
+        )}
       </button>
       {socials?.twitter && (
         <a
           href={socials.twitter.startsWith("http") ? socials.twitter : `https://twitter.com/${socials.twitter}`}
           target="_blank"
           rel="noopener noreferrer"
-          className="p-1.5 rounded bg-bg-tertiary/50 text-text-muted hover:text-[#1DA1F2] hover:bg-[#1DA1F2]/10 transition-colors"
+          className="p-1.5 rounded-lg border border-border/50 text-text-muted hover:text-[#1DA1F2] hover:bg-[#1DA1F2]/10 hover:border-[#1DA1F2]/20 transition-all"
           title="Twitter"
         >
           <TwitterIcon />
@@ -101,7 +85,7 @@ export function SocialLinks({ socials, mint }: SocialLinksProps) {
           href={socials.telegram.startsWith("http") ? socials.telegram : `https://t.me/${socials.telegram}`}
           target="_blank"
           rel="noopener noreferrer"
-          className="p-1.5 rounded bg-bg-tertiary/50 text-text-muted hover:text-[#0088cc] hover:bg-[#0088cc]/10 transition-colors"
+          className="p-1.5 rounded-lg border border-border/50 text-text-muted hover:text-[#0088cc] hover:bg-[#0088cc]/10 hover:border-[#0088cc]/20 transition-all"
           title="Telegram"
         >
           <TelegramIcon />
@@ -112,7 +96,7 @@ export function SocialLinks({ socials, mint }: SocialLinksProps) {
           href={socials.website.startsWith("http") ? socials.website : `https://${socials.website}`}
           target="_blank"
           rel="noopener noreferrer"
-          className="p-1.5 rounded bg-bg-tertiary/50 text-text-muted hover:text-accent-green hover:bg-accent-green/10 transition-colors"
+          className="p-1.5 rounded-lg border border-border/50 text-text-muted hover:text-accent-green hover:bg-accent-green/10 hover:border-accent-green/20 transition-all"
           title="Website"
         >
           <WebsiteIcon />
@@ -123,7 +107,7 @@ export function SocialLinks({ socials, mint }: SocialLinksProps) {
           href={socials.discord.startsWith("http") ? socials.discord : `https://discord.gg/${socials.discord}`}
           target="_blank"
           rel="noopener noreferrer"
-          className="p-1.5 rounded bg-bg-tertiary/50 text-text-muted hover:text-[#5865F2] hover:bg-[#5865F2]/10 transition-colors"
+          className="p-1.5 rounded-lg border border-border/50 text-text-muted hover:text-[#5865F2] hover:bg-[#5865F2]/10 hover:border-[#5865F2]/20 transition-all"
           title="Discord"
         >
           <DiscordIcon />
@@ -133,13 +117,15 @@ export function SocialLinks({ socials, mint }: SocialLinksProps) {
         href={`https://solscan.io/token/${mint}`}
         target="_blank"
         rel="noopener noreferrer"
-        className="p-1.5 rounded bg-bg-tertiary/50 text-text-muted hover:text-accent-blue hover:bg-accent-blue/10 transition-colors"
+        className="p-1.5 rounded-lg border border-border/50 text-text-muted hover:text-accent-blue hover:bg-accent-blue/10 hover:border-accent-blue/20 transition-all"
         title="View on Solscan"
       >
-        <SolscanIcon />
+        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" />
+        </svg>
       </a>
       {!hasAnySocial && (
-        <span className="text-[9px] text-text-muted/50 ml-1">No socials available</span>
+        <span className="text-[8px] text-text-muted/40 ml-1">No socials</span>
       )}
     </div>
   );

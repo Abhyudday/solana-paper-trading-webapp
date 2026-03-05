@@ -5,28 +5,21 @@ import { useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import { api, TokenSearchResult } from "@/lib/api";
 
-// Solana addresses are base58-encoded, 32-44 characters
 const SOLANA_ADDRESS_RE = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
 
-// Extract a Solana address from a Dexscreener or similar URL
 function extractAddressFromInput(raw: string): string | null {
   const trimmed = raw.trim();
 
-  // Direct address
   if (SOLANA_ADDRESS_RE.test(trimmed)) return trimmed;
 
-  // URL patterns: dexscreener.com/solana/<address>, birdeye.so/token/<address>, solscan.io/token/<address>
   try {
     const url = new URL(trimmed);
     const parts = url.pathname.split("/").filter(Boolean);
-    // Look for a path segment that looks like a Solana address
     for (const part of parts) {
-      // Strip query params that might be attached
       const clean = part.split("?")[0].split("#")[0];
       if (SOLANA_ADDRESS_RE.test(clean)) return clean;
     }
   } catch {
-    // Not a URL — try splitting by common delimiters and find an address
     const parts = trimmed.split(/[\/\s?#&=]+/);
     for (const part of parts) {
       if (SOLANA_ADDRESS_RE.test(part)) return part;
@@ -43,7 +36,6 @@ export function SearchBar() {
   const [navigating, setNavigating] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
-  // Derive the actual search query — strip address/URL to just search the token name
   const searchQuery = query.trim();
   const detectedAddress = extractAddressFromInput(searchQuery);
 
@@ -74,7 +66,6 @@ export function SearchBar() {
     navigateToToken(token.mint);
   }
 
-  // Handle paste: detect address and navigate directly
   const handlePaste = useCallback((e: React.ClipboardEvent<HTMLInputElement>) => {
     const pasted = e.clipboardData.getData("text");
     const address = extractAddressFromInput(pasted);
@@ -84,7 +75,6 @@ export function SearchBar() {
     }
   }, [navigateToToken]);
 
-  // Handle Enter key: if we detect an address, navigate directly
   const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter") {
       e.preventDefault();
@@ -122,8 +112,8 @@ export function SearchBar() {
           onFocus={() => searchQuery.length >= 2 && setOpen(true)}
           onPaste={handlePaste}
           onKeyDown={handleKeyDown}
-          placeholder="Search token or paste address / Dexscreener URL..."
-          className="w-full rounded-lg border border-border bg-bg-tertiary pl-9 pr-4 py-2 text-sm text-text-primary placeholder:text-text-muted outline-none focus:border-accent-blue/60 focus:ring-1 focus:ring-accent-blue/20 transition-all"
+          placeholder="Search token or paste address..."
+          className="w-full rounded-lg border border-border bg-bg-input pl-9 pr-4 py-2 text-[12px] text-text-primary placeholder:text-text-muted/60 outline-none focus:border-accent-green/30 focus:ring-1 focus:ring-accent-green/10 transition-all"
           aria-label="Search tokens"
           role="combobox"
           aria-expanded={open}
@@ -132,17 +122,17 @@ export function SearchBar() {
         />
         {isLoading && searchQuery.length >= 2 && (
           <div className="absolute right-3 top-1/2 -translate-y-1/2">
-            <div className="w-3.5 h-3.5 border-2 border-text-muted/30 border-t-accent-blue rounded-full animate-spin" />
+            <div className="w-3.5 h-3.5 border-2 border-text-muted/30 border-t-accent-green rounded-full animate-spin" />
           </div>
         )}
       </div>
       {showResults && (
-        <ul id="search-listbox" className="absolute top-full left-0 right-0 mt-1 max-h-80 overflow-y-auto rounded-lg border border-border bg-bg-secondary shadow-xl z-50" role="listbox">
+        <ul id="search-listbox" className="absolute top-full left-0 right-0 mt-1.5 max-h-80 overflow-y-auto rounded-xl border border-border bg-bg-secondary shadow-2xl z-50" role="listbox">
           {data.results.map((token) => (
             <li key={token.mint}>
               <button
                 onClick={() => selectToken(token)}
-                className="flex w-full items-center gap-3 px-4 py-3 text-left hover:bg-bg-tertiary transition-colors"
+                className="flex w-full items-center gap-3 px-4 py-2.5 text-left hover:bg-bg-hover transition-colors"
                 role="option"
                 aria-selected={false}
               >
@@ -153,21 +143,21 @@ export function SearchBar() {
                     alt={token.symbol}
                     width={28}
                     height={28}
-                    className="rounded-full h-7 w-7 object-cover"
+                    className="rounded-lg h-7 w-7 object-cover ring-1 ring-border"
                     onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
                   />
                 )}
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
-                    <span className="font-semibold text-sm">{token.symbol}</span>
-                    <span className="text-xs text-text-muted truncate">{token.name}</span>
+                    <span className="font-bold text-[12px]">{token.symbol}</span>
+                    <span className="text-[10px] text-text-muted truncate">{token.name}</span>
                   </div>
-                  <span className="text-xs text-text-muted font-mono truncate block">
+                  <span className="text-[10px] text-text-muted font-mono truncate block">
                     {token.mint.slice(0, 8)}...{token.mint.slice(-4)}
                   </span>
                 </div>
                 {token.price !== undefined && (
-                  <span className="text-sm font-mono text-text-secondary">
+                  <span className="text-[11px] font-mono text-accent-green font-semibold">
                     ${token.price < 0.01 ? token.price.toFixed(8) : token.price.toFixed(4)}
                   </span>
                 )}
@@ -177,8 +167,8 @@ export function SearchBar() {
         </ul>
       )}
       {showNoResults && (
-        <div className="absolute top-full left-0 right-0 mt-1 rounded-lg border border-border bg-bg-secondary shadow-xl z-50 px-4 py-6 text-center">
-          <span className="text-xs text-text-muted">No tokens found for &ldquo;{searchQuery}&rdquo;</span>
+        <div className="absolute top-full left-0 right-0 mt-1.5 rounded-xl border border-border bg-bg-secondary shadow-2xl z-50 px-4 py-6 text-center">
+          <span className="text-[11px] text-text-muted">No tokens found for &ldquo;{searchQuery}&rdquo;</span>
         </div>
       )}
     </div>

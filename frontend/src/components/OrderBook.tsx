@@ -19,18 +19,18 @@ function TxRow({ trade }: { trade: TokenTrade }) {
   const age = trade.time > 0 ? timeAgo(new Date(trade.time)) : "";
 
   return (
-    <div className="flex items-center gap-2 px-3 py-2 text-xs font-mono border-b border-border/40 hover:bg-bg-tertiary/40 transition-colors">
-      <div className={`w-0.5 h-6 rounded-full flex-shrink-0 ${isBuy ? "bg-accent-green" : "bg-accent-red"}`} />
-      <span className={`w-[72px] text-right flex-shrink-0 font-semibold ${isBuy ? "text-accent-green" : "text-accent-red"}`}>
+    <div className="dex-row flex items-center gap-2 px-3 py-1.5 text-[11px] font-mono border-b border-border/20">
+      <div className={`w-0.5 h-5 rounded-full flex-shrink-0 ${isBuy ? "bg-accent-green" : "bg-accent-red"}`} />
+      <span className={`w-[70px] text-right flex-shrink-0 font-bold ${isBuy ? "text-accent-green" : "text-accent-red"}`}>
         {formatTxAmount(trade.amountUsd)}
       </span>
-      <span className="w-[60px] text-right flex-shrink-0 text-text-secondary">
+      <span className="w-[55px] text-right flex-shrink-0 text-text-secondary text-[10px]">
         {trade.marketCap > 0 ? formatCompact(trade.marketCap) : formatCompact(trade.priceUsd)}
       </span>
-      <span className="flex-1 text-text-muted truncate">
+      <span className="flex-1 text-text-muted truncate text-[10px]">
         {shortenAddress(trade.wallet, 4)}
       </span>
-      <span className="text-text-muted flex-shrink-0 text-right w-[64px]">
+      <span className="text-text-muted flex-shrink-0 text-right w-[60px] text-[10px]">
         {age}
       </span>
     </div>
@@ -49,7 +49,6 @@ export function Transactions({ mint }: TransactionsProps) {
   });
 
   const freshTrades = data?.trades || [];
-  // Keep showing old trades if a refetch returned empty — avoids flicker
   if (freshTrades.length > 0) {
     lastTradesRef.current = freshTrades;
   }
@@ -58,31 +57,33 @@ export function Transactions({ mint }: TransactionsProps) {
   const isFirstLoad = !data && isFetching;
 
   return (
-    <div className="rounded border border-border bg-bg-card overflow-hidden">
-      <div className="flex items-center justify-between px-3 py-1.5 border-b border-border bg-bg-secondary">
-        <h3 className="text-[10px] font-semibold text-text-muted uppercase tracking-wider">Trades</h3>
-        <span className={`text-[9px] font-medium ${isFetching ? "text-yellow-400 animate-pulse" : "text-accent-green animate-pulse"}`}>
-          {isFetching ? "updating" : "live"}
+    <div className="rounded-xl border border-border bg-bg-card overflow-hidden">
+      <div className="flex items-center justify-between px-3 py-2 border-b border-border bg-bg-secondary">
+        <h3 className="text-[10px] font-bold text-text-muted uppercase tracking-widest">Trades</h3>
+        <span className="flex items-center gap-1.5">
+          <span className={`h-1.5 w-1.5 rounded-full ${isFetching ? "bg-accent-yellow" : "bg-accent-green"} live-dot`} />
+          <span className={`text-[8px] font-bold uppercase ${isFetching ? "text-accent-yellow" : "text-accent-green"}`}>
+            {isFetching ? "Updating" : "Live"}
+          </span>
         </span>
       </div>
 
       {/* Column headers */}
-      <div className="flex items-center gap-2 px-3 py-1 text-[9px] text-text-muted uppercase tracking-wide border-b border-border/40">
+      <div className="flex items-center gap-2 px-3 py-1.5 text-[8px] text-text-muted uppercase tracking-widest font-bold border-b border-border/30">
         <div className="w-0.5 flex-shrink-0" />
-        <span className="w-[72px] text-right flex-shrink-0">Amount</span>
-        <span className="w-[60px] text-right flex-shrink-0">Price</span>
+        <span className="w-[70px] text-right flex-shrink-0">Amount</span>
+        <span className="w-[55px] text-right flex-shrink-0">Price</span>
         <span className="flex-1">Trader</span>
-        <span className="text-right w-[64px] flex-shrink-0">Age</span>
+        <span className="text-right w-[60px] flex-shrink-0">Age</span>
       </div>
 
-      {/* Trades list */}
-      <div className="max-h-[300px] overflow-y-auto scrollbar-thin">
+      <div className="max-h-[300px] overflow-y-auto">
         {isFirstLoad ? (
           Array.from({ length: 8 }).map((_, i) => (
-            <div key={i} className="h-7 animate-pulse bg-bg-tertiary/10 border-b border-border/20" />
+            <div key={i} className="h-7 skeleton-shimmer border-b border-border/10 opacity-30" />
           ))
         ) : trades.length === 0 ? (
-          <div className="text-center text-text-muted text-[10px] py-6">No transactions found</div>
+          <div className="text-center text-text-muted text-[10px] py-8">No transactions found</div>
         ) : (
           trades.map((trade, i) => <TxRow key={`${trade.tx}-${i}`} trade={trade} />)
         )}
@@ -91,5 +92,4 @@ export function Transactions({ mint }: TransactionsProps) {
   );
 }
 
-// Keep backward-compatible export
 export { Transactions as OrderBook };

@@ -71,41 +71,37 @@ function TokenCard({ token, isNew }: { token: DisplayToken; isNew?: boolean }) {
   return (
     <Link
       href={`/token/${token.mint}`}
-      className={`token-card block rounded-lg border border-border bg-bg-card p-3.5 hover:border-accent-green/50 hover:bg-bg-card/80 transition-all duration-200 group ${isNew ? "token-card-enter" : ""}`}
+      className={`token-card block rounded-xl border border-border bg-bg-card p-3 hover:bg-bg-hover group ${isNew ? "token-card-enter" : ""}`}
       onMouseEnter={handlePrefetch}
     >
-      <div className="flex items-center gap-3">
-        {/* Token Avatar */}
-        <div className="flex-shrink-0">
+      <div className="flex items-center gap-2.5">
+        <div className="flex-shrink-0 relative">
           {token.image && !imgError ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
               src={token.image}
               alt={token.symbol}
-              className="h-11 w-11 rounded-full object-cover bg-bg-tertiary ring-2 ring-border group-hover:ring-accent-green/30 transition-all"
+              className="h-10 w-10 rounded-lg object-cover bg-bg-tertiary ring-1 ring-border group-hover:ring-accent-green/30 transition-all"
               onError={() => setImgError(true)}
             />
           ) : (
-            <div className="h-11 w-11 rounded-full bg-gradient-to-br from-bg-tertiary to-bg-secondary flex items-center justify-center text-sm font-bold text-text-muted ring-2 ring-border group-hover:ring-accent-green/30 transition-all">
+            <div className="h-10 w-10 rounded-lg bg-gradient-to-br from-accent-green/20 to-accent-blue/10 flex items-center justify-center text-sm font-bold text-accent-green/70 ring-1 ring-border group-hover:ring-accent-green/30 transition-all">
               {token.symbol?.charAt(0) || "?"}
             </div>
           )}
         </div>
 
-        {/* Token Info */}
         <div className="flex-1 min-w-0">
           <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-1.5 min-w-0">
-              <span className="font-bold text-sm text-text-primary truncate">{token.symbol}</span>
-              <span className="text-[11px] text-text-muted truncate max-w-[100px]">{token.name}</span>
+              <span className="font-bold text-[13px] text-text-primary truncate">{token.symbol}</span>
+              <span className="text-[10px] text-text-muted truncate max-w-[80px] hidden sm:inline">{token.name}</span>
             </div>
-            <span className="text-sm font-mono font-bold text-accent-green flex-shrink-0">
+            <span className="text-xs font-mono font-bold text-accent-green flex-shrink-0 text-glow-green">
               {formatCompact(token.marketCap)}
             </span>
           </div>
-
-          {/* Stats Row */}
-          <div className="flex items-center gap-3 mt-1.5">
+          <div className="flex items-center gap-2 mt-0.5">
             <button
               onClick={(e) => {
                 e.preventDefault();
@@ -114,7 +110,7 @@ function TokenCard({ token, isNew }: { token: DisplayToken; isNew?: boolean }) {
                 setMintCopied(true);
                 setTimeout(() => setMintCopied(false), 1500);
               }}
-              className={`text-[10px] font-mono transition-colors ${mintCopied ? "text-accent-green" : "text-text-muted hover:text-text-primary"}`}
+              className={`text-[9px] font-mono transition-colors ${mintCopied ? "text-accent-green" : "text-text-muted hover:text-text-primary"}`}
               title={mintCopied ? "Copied!" : "Click to copy address"}
             >
               {mintCopied ? "Copied!" : shortenAddress(token.mint, 4)}
@@ -126,23 +122,22 @@ function TokenCard({ token, isNew }: { token: DisplayToken; isNew?: boolean }) {
         </div>
       </div>
 
-      {/* Bottom Stats Bar */}
-      <div className="flex items-center justify-between mt-3 pt-2.5 border-t border-border/50">
-        <div className="flex items-center gap-1">
-          <span className="text-[10px] text-text-muted">MC</span>
-          <span className="text-[11px] font-mono font-semibold text-accent-green">{formatCompact(token.marketCap)}</span>
+      <div className="grid grid-cols-4 gap-1 mt-2.5 pt-2 border-t border-border/50">
+        <div className="text-center">
+          <div className="text-[8px] text-text-muted uppercase tracking-wider">MC</div>
+          <div className="text-[10px] font-mono font-semibold text-accent-green">{formatCompact(token.marketCap)}</div>
         </div>
-        <div className="flex items-center gap-1">
-          <span className="text-[10px] text-text-muted">Price</span>
-          <span className="text-[11px] font-mono font-medium text-text-primary">{formatPrice(token.price)}</span>
+        <div className="text-center">
+          <div className="text-[8px] text-text-muted uppercase tracking-wider">Price</div>
+          <div className="text-[10px] font-mono font-medium text-text-primary">{formatPrice(token.price)}</div>
         </div>
-        <div className="flex items-center gap-1">
-          <span className="text-[10px] text-text-muted">Vol</span>
-          <span className="text-[11px] font-mono font-medium text-text-secondary">{formatCompact(token.volume24h || 0)}</span>
+        <div className="text-center">
+          <div className="text-[8px] text-text-muted uppercase tracking-wider">Vol</div>
+          <div className="text-[10px] font-mono font-medium text-text-secondary">{formatCompact(token.volume24h || 0)}</div>
         </div>
-        <div className="flex items-center gap-1">
-          <span className="text-[10px] text-text-muted">Liq</span>
-          <span className="text-[11px] font-mono font-medium text-text-secondary">{formatCompact(token.liquidity)}</span>
+        <div className="text-center">
+          <div className="text-[8px] text-text-muted uppercase tracking-wider">Liq</div>
+          <div className="text-[10px] font-mono font-medium text-text-secondary">{formatCompact(token.liquidity)}</div>
         </div>
       </div>
     </Link>
@@ -150,9 +145,9 @@ function TokenCard({ token, isNew }: { token: DisplayToken; isNew?: boolean }) {
 }
 
 const SORT_OPTIONS: { key: SortKey; label: string }[] = [
-  { key: "default", label: "Default" },
+  { key: "default", label: "New" },
   { key: "mcap", label: "MC" },
-  { key: "volume", label: "Volume" },
+  { key: "volume", label: "Vol" },
   { key: "liquidity", label: "Liq" },
   { key: "price", label: "Price" },
 ];
@@ -185,6 +180,7 @@ function TokenColumn({
   isFilterLoading,
   hasData,
   color,
+  glowColor,
   filters,
   onOpenFilter,
   onTimeFilter,
@@ -197,6 +193,7 @@ function TokenColumn({
   isFilterLoading: boolean;
   hasData: boolean;
   color: string;
+  glowColor: string;
   filters: TokenFilterParams;
   onOpenFilter: () => void;
   onTimeFilter?: (tf: TimeFilter) => void;
@@ -215,7 +212,6 @@ function TokenColumn({
     return sortTokens(raw, sort);
   }, [defaultTokens, filteredTokens, hasFilters, sort]);
 
-  // Remember last non-empty list so columns never blank out during refetches
   if (tokens.length > 0) {
     lastTokensRef.current = tokens;
     hasEverLoadedRef.current = true;
@@ -223,8 +219,6 @@ function TokenColumn({
   if (hasData) hasEverLoadedRef.current = true;
   const displayTokens = tokens.length > 0 ? tokens : lastTokensRef.current;
 
-  // Detect which tokens are new (not in the previously seen set)
-  // Only detect new tokens AFTER we've already shown the first batch
   const newMints = useMemo(() => {
     if (!hasSeenFirstBatchRef.current) return new Set<string>();
     const fresh = new Set<string>();
@@ -234,7 +228,6 @@ function TokenColumn({
     return fresh;
   }, [displayTokens]);
 
-  // After render, update seen mints
   useEffect(() => {
     if (displayTokens.length > 0) {
       hasSeenFirstBatchRef.current = true;
@@ -242,32 +235,32 @@ function TokenColumn({
     seenMintsRef.current = new Set(displayTokens.map((t) => t.mint));
   }, [displayTokens]);
 
-  // Show loading skeleton when we've never received data
   const loading = !hasEverLoadedRef.current && displayTokens.length === 0;
 
   return (
     <div className="flex flex-col min-w-0">
       {/* Column Header */}
-      <div className="mb-2 px-1.5 py-2 border-b border-border">
+      <div className="mb-2 px-1 py-2.5 border-b border-border">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <span className={`h-2.5 w-2.5 rounded-full ${color} shadow-sm`} style={{ boxShadow: `0 0 8px ${color === 'bg-accent-green' ? '#00c853' : color === 'bg-accent-yellow' ? '#ffd600' : '#3b8bff'}50` }} />
-            <h2 className="text-[13px] font-extrabold text-text-primary uppercase tracking-wide">{title}</h2>
-            <span className="text-[10px] text-text-muted font-mono bg-bg-tertiary px-1.5 py-0.5 rounded-full">{displayTokens.length}</span>
+            <div className="relative">
+              <span className={`h-2 w-2 rounded-full ${color} block`} style={{ boxShadow: `0 0 8px ${glowColor}` }} />
+            </div>
+            <h2 className="text-xs font-extrabold text-text-primary uppercase tracking-wider">{title}</h2>
+            <span className="text-[9px] text-text-muted font-mono bg-bg-tertiary/80 px-1.5 py-0.5 rounded-md border border-border/50">{displayTokens.length}</span>
             {columnId === "migrating" && (
-              <span className="text-[9px] text-[#ffd600]/80 bg-[#ffd600]/10 px-1.5 py-0.5 rounded-full font-semibold">Highest MC first</span>
+              <span className="text-[8px] text-accent-yellow bg-accent-yellow/10 px-1.5 py-0.5 rounded-md font-bold border border-accent-yellow/20">TOP MC</span>
             )}
           </div>
-          <div className="flex items-center gap-1">
-            {/* Sort pills */}
+          <div className="flex items-center gap-0.5">
             {SORT_OPTIONS.map((opt) => (
               <button
                 key={opt.key}
                 onClick={() => setSort(opt.key)}
-                className={`px-2 py-1 rounded text-[10px] font-medium transition-all ${
+                className={`px-2 py-1 rounded-md text-[9px] font-semibold transition-all ${
                   sort === opt.key
-                    ? "bg-bg-tertiary text-text-primary shadow-sm"
-                    : "text-text-muted hover:text-text-secondary hover:bg-bg-tertiary/50"
+                    ? "bg-bg-tertiary text-text-primary border border-border-bright"
+                    : "text-text-muted hover:text-text-secondary"
                 }`}
               >
                 {opt.label}
@@ -275,10 +268,10 @@ function TokenColumn({
             ))}
             <button
               onClick={onOpenFilter}
-              className={`ml-1 flex items-center gap-1 px-2 py-1 rounded text-[10px] font-medium transition-all ${
+              className={`ml-0.5 flex items-center gap-1 px-2 py-1 rounded-md text-[9px] font-semibold transition-all ${
                 hasFilters
-                  ? "bg-accent-blue/15 text-accent-blue"
-                  : "text-text-muted hover:text-text-secondary hover:bg-bg-tertiary/50"
+                  ? "bg-accent-blue/10 text-accent-blue border border-accent-blue/20"
+                  : "text-text-muted hover:text-text-secondary"
               }`}
             >
               <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -288,10 +281,9 @@ function TokenColumn({
             </button>
           </div>
         </div>
-        {/* Time filter bar for New Pairs */}
         {columnId === "new" && onTimeFilter && (
-          <div className="flex items-center gap-1 mt-1.5">
-            <span className="text-[9px] text-text-muted mr-1">Age:</span>
+          <div className="flex items-center gap-1 mt-2">
+            <span className="text-[8px] text-text-muted mr-1 uppercase tracking-wider font-semibold">Age</span>
             {TIME_FILTER_OPTIONS.map((tf) => (
               <button
                 key={tf.key}
@@ -299,10 +291,10 @@ function TokenColumn({
                   setActiveTimeFilter(tf.key);
                   onTimeFilter(tf.key);
                 }}
-                className={`px-2 py-0.5 rounded text-[10px] font-bold transition-all ${
+                className={`px-2 py-0.5 rounded-md text-[9px] font-bold transition-all ${
                   activeTimeFilter === tf.key
-                    ? "bg-accent-green/20 text-accent-green shadow-sm"
-                    : "text-text-muted hover:text-text-secondary hover:bg-bg-tertiary/50"
+                    ? "bg-accent-green/10 text-accent-green border border-accent-green/20"
+                    : "text-text-muted hover:text-text-secondary"
                 }`}
               >
                 {tf.label}
@@ -312,25 +304,24 @@ function TokenColumn({
         )}
       </div>
 
-      {/* Token list — shows ~6-7 cards with smooth scroll for more */}
-      <div className="flex flex-col gap-2 overflow-y-auto max-h-[calc(100vh-130px)] pr-1 scroll-smooth token-list-scroll pt-1.5">
+      <div className="flex flex-col gap-1.5 overflow-y-auto max-h-[calc(100vh-140px)] pr-1 scroll-smooth token-list-scroll pt-1">
         {loading ? (
           Array.from({ length: 6 }).map((_, i) => (
-            <div key={i} className="rounded-lg border border-border bg-bg-card p-3.5 animate-pulse h-[100px]" />
+            <div key={i} className="rounded-xl border border-border bg-bg-card p-3 h-[90px] skeleton-shimmer" />
           ))
         ) : displayTokens.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 text-text-muted">
             {(isLoading || isFilterLoading) ? (
               <>
-                <div className="w-7 h-7 border-2 border-text-muted/30 border-t-accent-green rounded-full animate-spin mb-3" />
-                <span className="text-xs">Loading tokens...</span>
+                <div className="w-6 h-6 border-2 border-text-muted/30 border-t-accent-green rounded-full animate-spin mb-3" />
+                <span className="text-[11px]">Loading tokens...</span>
               </>
             ) : (
               <>
-                <svg className="w-10 h-10 mb-2 opacity-30" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <svg className="w-8 h-8 mb-2 opacity-20" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                 </svg>
-                <span className="text-xs">No tokens found</span>
+                <span className="text-[11px]">No tokens found</span>
               </>
             )}
           </div>
@@ -352,12 +343,10 @@ export default function LandingPage() {
   });
   const [filterOpen, setFilterOpen] = useState<ColumnId | null>(null);
 
-  // Refs to hold last non-empty token arrays — guarantees columns never go blank
   const lastLatestRef = useRef<TokenInfo[]>([]);
   const lastGraduatingRef = useRef<TokenInfo[]>([]);
   const lastGraduatedRef = useRef<TokenInfo[]>([]);
 
-  // Default (unfiltered) queries
   const { data: latestData, isLoading: latestLoading } = useQuery({
     queryKey: ["latestTokens"],
     queryFn: () => api.market.getLatestTokens(),
@@ -385,7 +374,6 @@ export default function LandingPage() {
     placeholderData: keepPreviousData,
   });
 
-  // Stabilize token arrays: never pass [] if we had data before
   const rawLatest = latestData?.tokens || [];
   const rawGraduating = graduatingData?.tokens || [];
   const rawGraduated = graduatedData?.tokens || [];
@@ -396,7 +384,6 @@ export default function LandingPage() {
   const stableGraduating = rawGraduating.length > 0 ? rawGraduating : lastGraduatingRef.current;
   const stableGraduated = rawGraduated.length > 0 ? rawGraduated : lastGraduatedRef.current;
 
-  // Filtered queries — only enabled when filters are active
   const newHasFilters = countActiveFilters(columnFilters.new) > 0;
   const migratingHasFilters = countActiveFilters(columnFilters.migrating) > 0;
   const migratedHasFilters = countActiveFilters(columnFilters.migrated) > 0;
@@ -452,9 +439,9 @@ export default function LandingPage() {
   }, []);
 
   return (
-    <div className="pt-2 pb-4">
+    <div className="pt-3 pb-4 page-enter">
       {/* 3-column trenches grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
         <TokenColumn
           title="New Pairs"
           columnId="new"
@@ -464,6 +451,7 @@ export default function LandingPage() {
           isFilterLoading={filteredNewLoading}
           hasData={!!latestData}
           color="bg-accent-green"
+          glowColor="#00ff8850"
           filters={columnFilters.new}
           onOpenFilter={() => setFilterOpen("new")}
           onTimeFilter={handleTimeFilter}
@@ -477,6 +465,7 @@ export default function LandingPage() {
           isFilterLoading={filteredMigratingLoading}
           hasData={!!graduatingData}
           color="bg-accent-yellow"
+          glowColor="#ffd00050"
           filters={columnFilters.migrating}
           onOpenFilter={() => setFilterOpen("migrating")}
         />
@@ -489,12 +478,12 @@ export default function LandingPage() {
           isFilterLoading={filteredMigratedLoading}
           hasData={!!graduatedData}
           color="bg-accent-blue"
+          glowColor="#00d4ff50"
           filters={columnFilters.migrated}
           onOpenFilter={() => setFilterOpen("migrated")}
         />
       </div>
 
-      {/* Filter panel modal */}
       {filterOpen && (
         <FilterPanel
           initialFilters={columnFilters[filterOpen]}
