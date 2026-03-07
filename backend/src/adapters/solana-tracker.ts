@@ -134,8 +134,14 @@ export async function checkDexPaid(mint: string): Promise<boolean> {
       memCache.set(cacheKey, false, 300);
       return false;
     }
-    const data = await res.json();
-    const paid = Array.isArray(data) && data.length > 0;
+    const data = await res.json() as {
+      orders?: Array<{ type?: string; status?: string }>;
+      boosts?: unknown[];
+    };
+    const orders = Array.isArray(data.orders) ? data.orders : Array.isArray(data) ? data : [];
+    const paid = orders.some(
+      (o) => o.type === "tokenProfile" && o.status === "approved"
+    );
     memCache.set(cacheKey, paid, 300);
     return paid;
   } catch {
