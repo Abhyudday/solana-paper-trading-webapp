@@ -232,7 +232,7 @@ export function SearchBar() {
                 role="option"
                 aria-selected={false}
               >
-                {token.image && (
+                {token.image ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
                     src={token.image}
@@ -242,21 +242,34 @@ export function SearchBar() {
                     className="rounded-lg h-7 w-7 object-cover ring-1 ring-border"
                     onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
                   />
+                ) : (
+                  <div className="h-7 w-7 rounded-lg bg-gradient-to-br from-accent-green/20 to-accent-blue/10 flex items-center justify-center text-[10px] font-bold text-accent-green/60 ring-1 ring-border flex-shrink-0">
+                    {token.symbol?.charAt(0) || "?"}
+                  </div>
                 )}
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
                     <span className="font-bold text-[12px]">{token.symbol}</span>
-                    <span className="text-[10px] text-text-muted truncate">{token.name}</span>
+                    {token.name && token.name !== token.symbol && (
+                      <span className="text-[10px] text-text-muted truncate">{token.name}</span>
+                    )}
                   </div>
                   <span className="text-[10px] text-text-muted font-mono truncate block">
                     {token.mint.slice(0, 8)}...{token.mint.slice(-4)}
                   </span>
                 </div>
-                {token.price !== undefined && (
-                  <span className="text-[11px] font-mono text-accent-green font-semibold">
-                    ${token.price < 0.01 ? token.price.toFixed(8) : token.price.toFixed(4)}
-                  </span>
-                )}
+                <div className="flex flex-col items-end gap-0.5 flex-shrink-0">
+                  {token.price !== undefined && token.price > 0 && (
+                    <span className="text-[11px] font-mono text-accent-green font-semibold">
+                      ${token.price < 0.01 ? token.price.toFixed(8) : token.price.toFixed(4)}
+                    </span>
+                  )}
+                  {token.marketCap !== undefined && token.marketCap > 0 && (
+                    <span className="text-[9px] font-mono text-text-muted">
+                      MC: ${token.marketCap >= 1e6 ? (token.marketCap / 1e6).toFixed(1) + "M" : token.marketCap >= 1e3 ? (token.marketCap / 1e3).toFixed(1) + "K" : token.marketCap.toFixed(0)}
+                    </span>
+                  )}
+                </div>
               </button>
             </li>
           ))}

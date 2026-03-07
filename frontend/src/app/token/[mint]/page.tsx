@@ -458,6 +458,20 @@ export default function TokenPage() {
 
             {infoTab === "info" && (
               <div className="p-3">
+                {t.dexPaid !== undefined && (
+                  <div className={`flex items-center gap-2 mb-2.5 p-2 rounded-lg border ${
+                    t.dexPaid
+                      ? "bg-accent-green/5 border-accent-green/20"
+                      : "bg-accent-red/5 border-accent-red/20"
+                  }`}>
+                    <span className={`text-[10px] font-bold ${t.dexPaid ? "text-accent-green" : "text-accent-red"}`}>
+                      {t.dexPaid ? "\u2713" : "\u2717"}
+                    </span>
+                    <span className={`text-[10px] font-semibold ${t.dexPaid ? "text-accent-green" : "text-accent-red"}`}>
+                      {t.dexPaid ? "DEX Screener Listing Paid" : "DEX Screener Listing Unpaid"}
+                    </span>
+                  </div>
+                )}
                 <div className="grid grid-cols-2 gap-2.5 text-[10px]">
                   <div className="bg-bg-tertiary/30 rounded-lg p-2">
                     <span className="text-text-muted block text-[8px] uppercase tracking-wider mb-0.5">Mint</span>

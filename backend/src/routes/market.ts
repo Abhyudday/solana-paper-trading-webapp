@@ -1,8 +1,18 @@
 import { FastifyInstance } from "fastify";
 import { searchSchema, chartSchema } from "../schemas/validation";
-import { SolanaTrackerAdapter } from "../adapters/solana-tracker";
+import { SolanaTrackerAdapter, checkDexPaid } from "../adapters/solana-tracker";
 import { generateOrderBook } from "../services/orderbook";
 import { safeGet, CACHE_KEYS } from "../lib/redis";
+import type { TokenInfo } from "../adapters/market-data";
+
+async function addDexPaid(tokens: TokenInfo[]): Promise<void> {
+  const results = await Promise.allSettled(
+    tokens.map((t) => checkDexPaid(t.mint))
+  );
+  tokens.forEach((t, i) => {
+    t.dexPaid = results[i].status === "fulfilled" ? results[i].value : false;
+  });
+}
 
 const adapter = new SolanaTrackerAdapter();
 
@@ -67,18 +77,21 @@ export async function marketRoutes(app: FastifyInstance) {
 
   app.get("/api/market/top", async (_request, reply) => {
     const tokens = await adapter.getTopTokens(50);
+    await addDexPaid(tokens);
     reply.header("Cache-Control", "public, max-age=5, stale-while-revalidate=15");
     return reply.send({ tokens });
   });
 
   app.get("/api/market/latest", async (_request, reply) => {
     const tokens = await adapter.getLatestTokens(50);
+    await addDexPaid(tokens);
     reply.header("Cache-Control", "public, max-age=5, stale-while-revalidate=15");
     return reply.send({ tokens });
   });
 
   app.get("/api/market/trending", async (_request, reply) => {
     const tokens = await adapter.getTrendingTokens(50);
+    await addDexPaid(tokens);
     reply.header("Cache-Control", "public, max-age=5, stale-while-revalidate=15");
     return reply.send({ tokens });
   });
@@ -113,12 +126,14 @@ export async function marketRoutes(app: FastifyInstance) {
 
   app.get("/api/market/graduating", async (_request, reply) => {
     const tokens = await adapter.getGraduatingTokens(50);
+    await addDexPaid(tokens);
     reply.header("Cache-Control", "public, max-age=5, stale-while-revalidate=15");
     return reply.send({ tokens });
   });
 
   app.get("/api/market/graduated", async (_request, reply) => {
     const tokens = await adapter.getGraduatedTokens(50);
+    await addDexPaid(tokens);
     reply.header("Cache-Control", "public, max-age=5, stale-while-revalidate=15");
     return reply.send({ tokens });
   });

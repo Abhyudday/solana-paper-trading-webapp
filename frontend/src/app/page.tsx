@@ -18,6 +18,7 @@ interface DisplayToken {
   marketCap: number;
   liquidity: number;
   volume24h?: number;
+  dexPaid?: boolean;
 }
 
 function toDisplayTokens(tokens: TokenInfo[] | FilteredTokenItem[]): DisplayToken[] {
@@ -30,6 +31,7 @@ function toDisplayTokens(tokens: TokenInfo[] | FilteredTokenItem[]): DisplayToke
     marketCap: t.marketCap,
     liquidity: t.liquidity,
     volume24h: t.volume24h,
+    dexPaid: "dexPaid" in t ? (t as TokenInfo).dexPaid : undefined,
   }));
 }
 
@@ -96,6 +98,9 @@ function TokenCard({ token, isNew }: { token: DisplayToken; isNew?: boolean }) {
             <div className="flex items-center gap-1.5 min-w-0">
               <span className="font-bold text-[13px] text-text-primary truncate">{token.symbol}</span>
               <span className="text-[10px] text-text-muted truncate max-w-[80px] hidden sm:inline">{token.name}</span>
+              {token.dexPaid && (
+                <span className="text-[7px] font-bold px-1 py-0.5 rounded bg-accent-green/10 text-accent-green border border-accent-green/20 flex-shrink-0">{"\u2713"} DEX</span>
+              )}
             </div>
             <span className="text-xs font-mono font-bold text-accent-green flex-shrink-0 text-glow-green">
               {formatCompact(token.marketCap)}

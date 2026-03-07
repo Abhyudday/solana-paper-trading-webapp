@@ -117,7 +117,7 @@ function rangeToInterval(range: ChartRange): string {
   }
 }
 
-async function checkDexPaid(mint: string): Promise<boolean> {
+export async function checkDexPaid(mint: string): Promise<boolean> {
   const cacheKey = `dexPaid:${mint}`;
   const memHit = memCache.get<boolean>(cacheKey);
   if (memHit !== null) return memHit;
@@ -146,7 +146,39 @@ async function checkDexPaid(mint: string): Promise<boolean> {
 
 export class SolanaTrackerAdapter implements MarketDataAdapter {
   async searchTokens(query: string): Promise<TokenSearchResult[]> {
-    const data = await fetchApi<Array<{
+    const raw = await fetchApi<
+      | Array<{
+          mint?: string;
+          address?: string;
+          token?: { mint?: string; symbol?: string; name?: string; image?: string };
+          symbol?: string;
+          name?: string;
+          image?: string;
+          pools?: Array<{ price?: { usd?: number }; marketCap?: { usd?: number } }>;
+        }>
+      | {
+          status?: string;
+          data?: Array<{
+            mint?: string;
+            address?: string;
+            token?: { mint?: string; symbol?: string; name?: string; image?: string };
+            symbol?: string;
+            name?: string;
+            image?: string;
+            pools?: Array<{ price?: { usd?: number }; marketCap?: { usd?: number } }>;
+            priceUsd?: number;
+            marketCapUsd?: number;
+          }>;
+        }
+    >("/search", { query });
+
+    const items: Array<Record<string, unknown>> = Array.isArray(raw)
+      ? raw
+      : Array.isArray((raw as { data?: unknown[] }).data)
+        ? (raw as { data: Array<Record<string, unknown>> }).data
+        : [];
+
+    return (items as Array<{
       mint?: string;
       address?: string;
       token?: { mint?: string; symbol?: string; name?: string; image?: string };
@@ -154,17 +186,16 @@ export class SolanaTrackerAdapter implements MarketDataAdapter {
       name?: string;
       image?: string;
       pools?: Array<{ price?: { usd?: number }; marketCap?: { usd?: number } }>;
-    }>>("/search", { query });
-
-    const items = Array.isArray(data) ? data : [];
-    return items
+      priceUsd?: number;
+      marketCapUsd?: number;
+    }>)
       .map((item) => ({
         mint: item.token?.mint || item.mint || item.address || "",
         symbol: item.token?.symbol || item.symbol || "",
         name: item.token?.name || item.name || "",
         image: item.token?.image || item.image,
-        price: item.pools?.[0]?.price?.usd,
-        marketCap: item.pools?.[0]?.marketCap?.usd,
+        price: item.pools?.[0]?.price?.usd ?? item.priceUsd,
+        marketCap: item.pools?.[0]?.marketCap?.usd ?? item.marketCapUsd,
       }))
       .filter((r) => r.mint.length >= 32)
       .slice(0, 10);

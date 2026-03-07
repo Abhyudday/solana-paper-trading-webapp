@@ -87,6 +87,9 @@ function TrendingTokenRow({ token, rank }: { token: TokenInfo; rank: number }) {
           {isTop3 && (
             <span className="text-[7px] px-1.5 py-0.5 rounded-md bg-accent-green/10 text-accent-green font-bold border border-accent-green/20 uppercase">Hot</span>
           )}
+          {token.dexPaid && (
+            <span className="text-[7px] px-1 py-0.5 rounded bg-accent-green/10 text-accent-green font-bold border border-accent-green/20 flex-shrink-0">{"\u2713"} DEX</span>
+          )}
         </div>
         <span className="text-[10px] text-text-muted truncate">{token.name}</span>
       </div>
