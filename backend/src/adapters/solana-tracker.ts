@@ -56,7 +56,7 @@ function calculateRiskScore(bundled: boolean, bundlePercentage: number, bundleCo
 }
 
 const CACHE_TTL_PRICE = 5; // seconds
-const CACHE_TTL_INFO = 300;
+const CACHE_TTL_INFO = 15;
 const CACHE_TTL_TOP = 30;
 const CACHE_TTL_CHART = 5;
 
@@ -117,6 +117,33 @@ function rangeToInterval(range: ChartRange): string {
   }
 }
 
+async function checkDexPaid(mint: string): Promise<boolean> {
+  const cacheKey = `dexPaid:${mint}`;
+  const memHit = memCache.get<boolean>(cacheKey);
+  if (memHit !== null) return memHit;
+
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 3000);
+    const res = await fetch(`https://api.dexscreener.com/orders/v1/solana/${mint}`, {
+      headers: { Accept: "application/json" },
+      signal: controller.signal,
+    });
+    clearTimeout(timeout);
+    if (!res.ok) {
+      memCache.set(cacheKey, false, 300);
+      return false;
+    }
+    const data = await res.json();
+    const paid = Array.isArray(data) && data.length > 0;
+    memCache.set(cacheKey, paid, 300);
+    return paid;
+  } catch {
+    memCache.set(cacheKey, false, 60);
+    return false;
+  }
+}
+
 export class SolanaTrackerAdapter implements MarketDataAdapter {
   async searchTokens(query: string): Promise<TokenSearchResult[]> {
     const data = await fetchApi<Array<{
@@ -149,25 +176,31 @@ export class SolanaTrackerAdapter implements MarketDataAdapter {
 
     const cached = await safeGet(CACHE_KEYS.tokenInfo(mint));
     if (cached) {
-      const parsed = JSON.parse(cached);
-      memCache.set(`ti:${mint}`, parsed, 15);
+      const parsed = JSON.parse(cached) as TokenInfo;
+      if (parsed.dexPaid === undefined) {
+        parsed.dexPaid = await checkDexPaid(mint);
+      }
+      memCache.set(`ti:${mint}`, parsed, 3);
       return parsed;
     }
 
     try {
-      const data = await fetchApi<{
-        token?: {
-          mint?: string; symbol?: string; name?: string; decimals?: number; image?: string;
-          twitter?: string; telegram?: string; website?: string; discord?: string;
-        };
-        pools?: Array<{
-          price?: { usd?: number };
-          liquidity?: { usd?: number };
-          marketCap?: { usd?: number };
-          volume?: { h24?: number };
-        }>;
-        supply?: number;
-      }>(`/tokens/${mint}`);
+      const [data, dexPaid] = await Promise.all([
+        fetchApi<{
+          token?: {
+            mint?: string; symbol?: string; name?: string; decimals?: number; image?: string;
+            twitter?: string; telegram?: string; website?: string; discord?: string;
+          };
+          pools?: Array<{
+            price?: { usd?: number };
+            liquidity?: { usd?: number };
+            marketCap?: { usd?: number };
+            volume?: { h24?: number };
+          }>;
+          supply?: number;
+        }>(`/tokens/${mint}`),
+        checkDexPaid(mint),
+      ]);
 
       const pool = data.pools?.[0];
       const socials: Record<string, string> = {};
@@ -188,9 +221,10 @@ export class SolanaTrackerAdapter implements MarketDataAdapter {
         image: data.token?.image,
         volume24h: pool?.volume?.h24 || 0,
         socials: Object.keys(socials).length > 0 ? socials : undefined,
+        dexPaid,
       };
 
-      memCache.set(`ti:${mint}`, info, 15);
+      memCache.set(`ti:${mint}`, info, 3);
       await safeSet(CACHE_KEYS.tokenInfo(mint), JSON.stringify(info), "EX", CACHE_TTL_INFO);
       await safeSet(CACHE_KEYS.tokenPrice(mint), String(info.price), "EX", CACHE_TTL_PRICE);
 

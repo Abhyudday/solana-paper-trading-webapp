@@ -26,6 +26,7 @@ export interface TokenInfo {
   image?: string;
   volume24h?: number;
   socials?: TokenSocials;
+  dexPaid?: boolean;
 }
 
 export type WalletType = "whale" | "sniper" | "team" | "dex" | "cex" | "contract" | "liquidity_pool" | "unknown";

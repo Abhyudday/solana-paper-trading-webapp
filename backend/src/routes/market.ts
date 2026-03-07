@@ -22,7 +22,14 @@ export async function marketRoutes(app: FastifyInstance) {
     if (!info) {
       return reply.status(404).send({ error: "Token not found" });
     }
-    reply.header("Cache-Control", "public, max-age=5, stale-while-revalidate=10");
+    const freshPriceStr = await safeGet(CACHE_KEYS.tokenPrice(mint));
+    if (freshPriceStr) {
+      const freshPrice = parseFloat(freshPriceStr);
+      if (freshPrice > 0) {
+        info.price = freshPrice;
+      }
+    }
+    reply.header("Cache-Control", "no-cache, no-store");
     return reply.send(info);
   });
 

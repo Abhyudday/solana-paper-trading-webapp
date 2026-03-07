@@ -1,6 +1,7 @@
 import { Queue, Worker } from "bullmq";
 import { redis, redisConnected, safeSet, safePublish, CACHE_KEYS, CHANNELS } from "../lib/redis";
 import { SolanaTrackerAdapter } from "../adapters/solana-tracker";
+import { memCache } from "../lib/mem-cache";
 import { prisma } from "../lib/prisma";
 import { checkAndFillLimitOrders } from "../services/limit-order";
 
@@ -39,6 +40,7 @@ export async function startPricePoller() {
 
       for (const mint of mints) {
         try {
+          memCache.delete(`ti:${mint}`);
           const info = await adapter.getTokenInfo(mint);
           if (info && info.price > 0) {
             await safeSet(CACHE_KEYS.tokenPrice(mint), String(info.price), "EX", 30);
