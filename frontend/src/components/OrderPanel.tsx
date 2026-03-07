@@ -58,6 +58,8 @@ export function OrderPanel({ token, usdcBalance, tokenQty }: OrderPanelProps) {
       setAmount("");
       setError(null);
       queryClient.invalidateQueries({ queryKey: ["portfolio"] });
+      queryClient.invalidateQueries({ queryKey: ["userTrades"] });
+      queryClient.invalidateQueries({ queryKey: ["trades"] });
       queryClient.invalidateQueries({ queryKey: ["orderbook", token.mint] });
       setTimeout(() => setSuccess(null), 5000);
     },

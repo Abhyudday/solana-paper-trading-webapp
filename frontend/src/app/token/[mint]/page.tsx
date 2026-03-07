@@ -91,15 +91,15 @@ export default function TokenPage() {
     queryKey: ["portfolio"],
     queryFn: () => api.portfolio.get(),
     enabled: isAuthenticated,
-    refetchInterval: 15_000,
-    staleTime: 10_000,
+    refetchInterval: 5_000,
+    staleTime: 2_000,
   });
 
   const { data: userTradesData } = useQuery({
     queryKey: ["userTrades"],
     queryFn: () => api.portfolio.getTrades(200, 0),
     enabled: isAuthenticated,
-    staleTime: 15_000,
+    staleTime: 2_000,
   });
 
   useEffect(() => {
@@ -193,8 +193,14 @@ export default function TokenPage() {
   const position = portfolio?.positions.find((p) => p.mint === mint);
   const tokenQty = position?.qty ?? 0;
   const primaryBars = chartData?.bars ?? [];
-  const chartBars = primaryBars.length > 0 ? primaryBars : (fallbackChartData?.bars ?? []);
-  const usingFallback = primaryBars.length === 0 && chartBars.length > 0;
+  const rawChartBars = primaryBars.length > 0 ? primaryBars : (fallbackChartData?.bars ?? []);
+  const usingFallback = primaryBars.length === 0 && rawChartBars.length > 0;
+
+  const lastGoodBarsRef = useRef<import("@/lib/api").OHLCVBar[]>([]);
+  if (rawChartBars.length > 0) {
+    lastGoodBarsRef.current = rawChartBars;
+  }
+  const chartBars = rawChartBars.length > 0 ? rawChartBars : lastGoodBarsRef.current;
 
   const avgExitPrice = useMemo(() => {
     if (!userTradesData?.trades) return undefined;
@@ -369,17 +375,23 @@ export default function TokenPage() {
                 )}
               </div>
             </div>
-            {position && position.qty > 0 && (
-              <div className="flex items-center gap-4 px-3 py-2 bg-bg-secondary/50 border-b border-border text-[10px]">
-                <span className="text-text-muted font-semibold uppercase tracking-wider text-[8px]">My Position</span>
-                <span className="font-mono text-text-secondary">Qty: <b className="text-text-primary">{formatNumber(position.qty, 4)}</b></span>
-                <span className="font-mono text-text-secondary">Avg Entry: <b className="text-text-primary">{formatPrice(position.avgEntryPrice)}</b></span>
-                <span className="font-mono text-text-secondary">Value: <b className="text-text-primary">${formatNumber(position.value, 2)}</b></span>
-                <span className={`font-mono font-bold ${position.unrealizedPnl >= 0 ? "text-accent-green" : "text-accent-red"}`}>
-                  P&L: {formatPnl(position.unrealizedPnl)} ({position.avgEntryPrice > 0 ? formatPercent(((position.currentPrice - position.avgEntryPrice) / position.avgEntryPrice) * 100) : "0%"})
-                </span>
-              </div>
-            )}
+            {position && position.qty > 0 && (() => {
+              const livePrice = t.price;
+              const liveValue = livePrice * position.qty;
+              const livePnl = (livePrice - position.avgEntryPrice) * position.qty;
+              const liveRoi = position.avgEntryPrice > 0 ? ((livePrice - position.avgEntryPrice) / position.avgEntryPrice) * 100 : 0;
+              return (
+                <div className="flex items-center gap-4 px-3 py-2 bg-bg-secondary/50 border-b border-border text-[10px]">
+                  <span className="text-text-muted font-semibold uppercase tracking-wider text-[8px]">My Position</span>
+                  <span className="font-mono text-text-secondary">Qty: <b className="text-text-primary">{formatNumber(position.qty, 4)}</b></span>
+                  <span className="font-mono text-text-secondary">Avg Entry: <b className="text-text-primary">{formatPrice(position.avgEntryPrice)}</b></span>
+                  <span className="font-mono text-text-secondary">Value: <b className="text-text-primary">${formatNumber(liveValue, 2)}</b></span>
+                  <span className={`font-mono font-bold ${livePnl >= 0 ? "text-accent-green" : "text-accent-red"}`}>
+                    P&L: {formatPnl(livePnl)} ({formatPercent(liveRoi)})
+                  </span>
+                </div>
+              );
+            })()}
             {chartLoading && chartBars.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-[400px] text-text-muted bg-bg-card gap-3">
                 <div className="w-6 h-6 border-2 border-text-muted/30 border-t-accent-green rounded-full animate-spin" />
