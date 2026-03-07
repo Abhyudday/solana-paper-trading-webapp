@@ -136,6 +136,8 @@ interface ChartProps {
   marketCap?: number;
   currentPrice?: number;
   range?: string;
+  avgEntryPrice?: number;
+  avgExitPrice?: number;
 }
 
 /** Convert range string to bucket duration in seconds */
@@ -180,7 +182,7 @@ function aggregateCandles(data: OHLCVBar[], range?: string): OHLCVBar[] {
   return result;
 }
 
-export const Chart = memo(function Chart({ data, height = 400, supply, marketCap, currentPrice, range }: ChartProps) {
+export const Chart = memo(function Chart({ data, height = 400, supply, marketCap, currentPrice, range, avgEntryPrice, avgExitPrice }: ChartProps) {
   const [chartMode, setChartMode] = useState<ChartMode>("price");
   const priceContainerRef = useRef<HTMLDivElement>(null);
   const volumeContainerRef = useRef<HTMLDivElement>(null);
@@ -204,6 +206,8 @@ export const Chart = memo(function Chart({ data, height = 400, supply, marketCap
   const [chartError, setChartError] = useState<string | null>(null);
   const [activeIndicators, setActiveIndicators] = useState<Set<IndicatorKey>>(new Set());
   const [showIndicatorPanel, setShowIndicatorPanel] = useState(false);
+  const entryPriceLineRef = useRef<any>(null);
+  const exitPriceLineRef = useRef<any>(null);
 
   const volumeHeight = Math.round(height * 0.25);
   const oscillatorHeight = 100;
@@ -567,6 +571,50 @@ export const Chart = memo(function Chart({ data, height = 400, supply, marketCap
       }
     }
   }, [data, chartMode, supply, marketCap, currentPrice, activeIndicators, range]);
+
+  // ── PRICE LINE MANAGEMENT (avg entry / avg exit) ──
+  useEffect(() => {
+    const candleSeries = candleSeriesRef.current;
+    if (!candleSeries) return;
+
+    if (entryPriceLineRef.current) {
+      try { candleSeries.removePriceLine(entryPriceLineRef.current); } catch {}
+      entryPriceLineRef.current = null;
+    }
+    if (exitPriceLineRef.current) {
+      try { candleSeries.removePriceLine(exitPriceLineRef.current); } catch {}
+      exitPriceLineRef.current = null;
+    }
+
+    let multiplier = 1;
+    if (chartMode === "mcap") {
+      if (supply && supply > 0) multiplier = supply;
+      else if (marketCap && currentPrice && currentPrice > 0) multiplier = marketCap / currentPrice;
+    }
+
+    if (avgEntryPrice && avgEntryPrice > 0) {
+      entryPriceLineRef.current = candleSeries.createPriceLine({
+        price: avgEntryPrice * multiplier,
+        color: '#00ff88',
+        lineWidth: 1 as const,
+        lineStyle: 2 as const,
+        axisLabelVisible: true,
+        title: 'Avg Entry',
+      });
+    }
+
+    if (avgExitPrice && avgExitPrice > 0) {
+      exitPriceLineRef.current = candleSeries.createPriceLine({
+        price: avgExitPrice * multiplier,
+        color: '#ff8c00',
+        lineWidth: 1 as const,
+        lineStyle: 2 as const,
+        axisLabelVisible: true,
+        title: 'Avg Exit',
+      });
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [avgEntryPrice, avgExitPrice, chartMode, supply, marketCap, currentPrice, structureKey]);
 
   const filtered = useMemo(() => aggregateCandles(data, range), [data, range]);
   if (filtered.length === 0 && !chartError) {

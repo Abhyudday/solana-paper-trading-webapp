@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/context/AuthContext";
 import { api, PortfolioAnalytics, LimitOrderResult } from "@/lib/api";
@@ -40,6 +40,45 @@ export default function PortfolioPage() {
     enabled: isAuthenticated,
     refetchInterval: 10_000,
   });
+
+  const totalUnrealizedPnl = useMemo(
+    () => portfolio?.positions.reduce((sum, pos) => sum + pos.unrealizedPnl, 0) ?? 0,
+    [portfolio]
+  );
+  const totalRealizedPnl = useMemo(
+    () => (portfolio?.overallPnl ?? 0) - totalUnrealizedPnl,
+    [portfolio, totalUnrealizedPnl]
+  );
+
+  const tradesWithPnl = useMemo(() => {
+    if (!tradesData?.trades || tradesData.trades.length === 0) return [];
+    const sorted = [...tradesData.trades].sort(
+      (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+    );
+    const mintState: Record<string, { totalQty: number; totalCost: number }> = {};
+    const pnlMap = new Map<string, number>();
+    for (const trade of sorted) {
+      if (!mintState[trade.mint]) mintState[trade.mint] = { totalQty: 0, totalCost: 0 };
+      const state = mintState[trade.mint];
+      if (trade.side === "buy") {
+        state.totalCost += trade.qty * trade.price;
+        state.totalQty += trade.qty;
+      } else {
+        const avgEntry = state.totalQty > 0 ? state.totalCost / state.totalQty : 0;
+        const pnl = (trade.price - avgEntry) * trade.qty;
+        pnlMap.set(trade.id, pnl);
+        const sellRatio = state.totalQty > 0 ? Math.min(trade.qty / state.totalQty, 1) : 1;
+        state.totalCost -= state.totalCost * sellRatio;
+        state.totalQty = Math.max(state.totalQty - trade.qty, 0);
+      }
+    }
+    return tradesData.trades.map((t) => ({ ...t, computedPnl: pnlMap.get(t.id) }));
+  }, [tradesData]);
+
+  const historyTotalPnl = useMemo(
+    () => tradesWithPnl.reduce((sum, t) => sum + (t.computedPnl ?? 0), 0),
+    [tradesWithPnl]
+  );
 
   if (!isAuthenticated) {
     return (
@@ -91,11 +130,17 @@ export default function PortfolioPage() {
 
         {/* Right: PnL Stats */}
         <div className="rounded-xl border border-border bg-bg-card p-4">
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
             <div>
               <span className="text-[9px] text-text-muted uppercase tracking-wider block">Total PnL</span>
               <div className={`text-base font-bold font-mono ${portfolio.overallPnl >= 0 ? "text-accent-green" : "text-accent-red"}`}>
                 {formatPnl(portfolio.overallPnl)}
+              </div>
+            </div>
+            <div>
+              <span className="text-[9px] text-text-muted uppercase tracking-wider block">Realized P&L</span>
+              <div className={`text-base font-bold font-mono ${totalRealizedPnl >= 0 ? "text-accent-green" : "text-accent-red"}`}>
+                {formatPnl(totalRealizedPnl)}
               </div>
             </div>
             <div>
@@ -112,18 +157,34 @@ export default function PortfolioPage() {
             </div>
           </div>
 
-          <div className="mt-3 pt-3 border-t border-border">
-            <div className="flex items-center justify-between">
-              <span className="text-[9px] text-text-muted uppercase tracking-wider">Unrealized Profits</span>
-              <span className={`text-xs font-bold font-mono ${portfolio.overallPnl >= 0 ? "text-accent-green" : "text-accent-red"}`}>
-                {formatPnl(portfolio.overallPnl)}
-              </span>
+          <div className="mt-3 pt-3 border-t border-border grid grid-cols-2 gap-3">
+            <div>
+              <div className="flex items-center justify-between">
+                <span className="text-[9px] text-text-muted uppercase tracking-wider">Unrealized P&L</span>
+                <span className={`text-xs font-bold font-mono ${totalUnrealizedPnl >= 0 ? "text-accent-green" : "text-accent-red"}`}>
+                  {formatPnl(totalUnrealizedPnl)}
+                </span>
+              </div>
+              <div className="mt-1.5 h-1 bg-bg-tertiary rounded-full overflow-hidden">
+                <div
+                  className={`h-full rounded-full transition-all duration-500 ${totalUnrealizedPnl >= 0 ? "bg-accent-green" : "bg-accent-red"}`}
+                  style={{ width: `${Math.min(Math.abs(portfolio.roi), 100)}%` }}
+                />
+              </div>
             </div>
-            <div className="mt-1.5 h-1 bg-bg-tertiary rounded-full overflow-hidden">
-              <div
-                className={`h-full rounded-full transition-all duration-500 ${portfolio.overallPnl >= 0 ? "bg-accent-green" : "bg-accent-red"}`}
-                style={{ width: `${Math.min(Math.abs(portfolio.roi), 100)}%` }}
-              />
+            <div>
+              <div className="flex items-center justify-between">
+                <span className="text-[9px] text-text-muted uppercase tracking-wider">Realized P&L</span>
+                <span className={`text-xs font-bold font-mono ${totalRealizedPnl >= 0 ? "text-accent-green" : "text-accent-red"}`}>
+                  {formatPnl(totalRealizedPnl)}
+                </span>
+              </div>
+              <div className="mt-1.5 h-1 bg-bg-tertiary rounded-full overflow-hidden">
+                <div
+                  className={`h-full rounded-full transition-all duration-500 ${totalRealizedPnl >= 0 ? "bg-accent-green" : "bg-accent-red"}`}
+                  style={{ width: `${Math.min(Math.abs(totalRealizedPnl) / (Math.abs(portfolio.overallPnl) || 1) * 100, 100)}%` }}
+                />
+              </div>
             </div>
           </div>
         </div>
@@ -172,7 +233,8 @@ export default function PortfolioPage() {
                     <th className="text-right px-4 py-2.5 text-[9px] font-bold text-text-muted uppercase tracking-wider">Avg Entry</th>
                     <th className="text-right px-4 py-2.5 text-[9px] font-bold text-text-muted uppercase tracking-wider">Price</th>
                     <th className="text-right px-4 py-2.5 text-[9px] font-bold text-text-muted uppercase tracking-wider">Value</th>
-                    <th className="text-right px-4 py-2.5 text-[9px] font-bold text-text-muted uppercase tracking-wider">PnL</th>
+                    <th className="text-right px-4 py-2.5 text-[9px] font-bold text-text-muted uppercase tracking-wider">Unrealized</th>
+                    <th className="text-right px-4 py-2.5 text-[9px] font-bold text-text-muted uppercase tracking-wider">Realized</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -190,6 +252,9 @@ export default function PortfolioPage() {
                       <td className={`text-right px-4 py-2.5 font-mono font-bold ${pos.unrealizedPnl >= 0 ? "text-accent-green" : "text-accent-red"}`}>
                         {formatPnl(pos.unrealizedPnl)}
                       </td>
+                      <td className={`text-right px-4 py-2.5 font-mono font-bold ${pos.realizedPnl >= 0 ? "text-accent-green" : "text-accent-red"}`}>
+                        {formatPnl(pos.realizedPnl)}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -201,7 +266,7 @@ export default function PortfolioPage() {
 
       {tab === "history" && (
         <div>
-          {!tradesData?.trades || tradesData.trades.length === 0 ? (
+          {tradesWithPnl.length === 0 ? (
             <div className="rounded-xl border border-border bg-bg-card p-10 text-center text-text-muted text-[11px]">
               No trades yet.
             </div>
@@ -216,11 +281,12 @@ export default function PortfolioPage() {
                     <th className="text-right px-4 py-2.5 text-[9px] font-bold text-text-muted uppercase tracking-wider">Qty</th>
                     <th className="text-right px-4 py-2.5 text-[9px] font-bold text-text-muted uppercase tracking-wider">Price</th>
                     <th className="text-right px-4 py-2.5 text-[9px] font-bold text-text-muted uppercase tracking-wider">Total</th>
+                    <th className="text-right px-4 py-2.5 text-[9px] font-bold text-text-muted uppercase tracking-wider">P&L</th>
                     <th className="text-right px-4 py-2.5 text-[9px] font-bold text-text-muted uppercase tracking-wider">Fee</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {tradesData.trades.map((trade) => (
+                  {tradesWithPnl.map((trade) => (
                     <tr key={trade.id} className="dex-row border-b border-border/30">
                       <td className="px-4 py-2.5 text-text-muted">{timeAgo(trade.timestamp)}</td>
                       <td className="px-4 py-2.5">
@@ -244,10 +310,30 @@ export default function PortfolioPage() {
                       }`}>
                         {trade.side === "buy" ? "-" : "+"}{formatUSD(trade.qty * trade.price)}
                       </td>
+                      <td className="text-right px-4 py-2.5 font-mono font-bold">
+                        {trade.computedPnl !== undefined ? (
+                          <span className={trade.computedPnl >= 0 ? "text-accent-green" : "text-accent-red"}>
+                            {formatPnl(trade.computedPnl)}
+                          </span>
+                        ) : (
+                          <span className="text-text-muted">--</span>
+                        )}
+                      </td>
                       <td className="text-right px-4 py-2.5 font-mono text-text-muted">{formatUSD(trade.fee)}</td>
                     </tr>
                   ))}
                 </tbody>
+                <tfoot>
+                  <tr className="border-t border-border bg-bg-secondary/50">
+                    <td colSpan={6} className="px-4 py-2.5 text-[9px] font-bold text-text-muted uppercase tracking-wider text-right">
+                      Total Realized P&L
+                    </td>
+                    <td className={`text-right px-4 py-2.5 font-mono font-bold ${historyTotalPnl >= 0 ? "text-accent-green" : "text-accent-red"}`}>
+                      {formatPnl(historyTotalPnl)}
+                    </td>
+                    <td />
+                  </tr>
+                </tfoot>
               </table>
             </div>
           )}

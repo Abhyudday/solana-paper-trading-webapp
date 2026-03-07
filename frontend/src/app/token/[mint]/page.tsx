@@ -1,13 +1,13 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import dynamic from "next/dynamic";
 import { useParams } from "next/navigation";
 import { useQuery, useQueryClient, keepPreviousData } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { wsClient } from "@/lib/ws";
-import { formatPrice, formatCompact, formatNumber, shortenAddress } from "@/lib/format";
+import { formatPrice, formatCompact, formatNumber, shortenAddress, formatPnl, formatPercent } from "@/lib/format";
 import { OrderPanel } from "@/components/OrderPanel";
 import { Transactions } from "@/components/OrderBook";
 import { TopHolders } from "@/components/TopHolders";
@@ -93,6 +93,13 @@ export default function TokenPage() {
     enabled: isAuthenticated,
     refetchInterval: 15_000,
     staleTime: 10_000,
+  });
+
+  const { data: userTradesData } = useQuery({
+    queryKey: ["userTrades"],
+    queryFn: () => api.portfolio.getTrades(200, 0),
+    enabled: isAuthenticated,
+    staleTime: 15_000,
   });
 
   useEffect(() => {
@@ -189,6 +196,15 @@ export default function TokenPage() {
   const chartBars = primaryBars.length > 0 ? primaryBars : (fallbackChartData?.bars ?? []);
   const usingFallback = primaryBars.length === 0 && chartBars.length > 0;
 
+  const avgExitPrice = useMemo(() => {
+    if (!userTradesData?.trades) return undefined;
+    const sellTrades = userTradesData.trades.filter((tr) => tr.mint === mint && tr.side === "sell");
+    if (sellTrades.length === 0) return undefined;
+    const totalQty = sellTrades.reduce((sum, tr) => sum + tr.qty, 0);
+    const totalValue = sellTrades.reduce((sum, tr) => sum + tr.qty * tr.price, 0);
+    return totalQty > 0 ? totalValue / totalQty : undefined;
+  }, [userTradesData, mint]);
+
   if (!tokenInfo && tokenFetched && !tokenLoading) {
     return (
       <div className="flex items-center justify-center h-96">
@@ -262,6 +278,15 @@ export default function TokenPage() {
             <div className="flex items-center gap-2">
               <span className="font-bold text-[15px]">{t.symbol}</span>
               <span className="text-[11px] text-text-muted">{t.name}</span>
+              {t.dexPaid !== undefined && (
+                <span className={`text-[8px] font-bold px-1.5 py-0.5 rounded border ${
+                  t.dexPaid
+                    ? "bg-accent-green/10 text-accent-green border-accent-green/20"
+                    : "bg-text-muted/10 text-text-muted border-border"
+                }`}>
+                  {t.dexPaid ? "\u2713 DEX PAID" : "DEX UNPAID"}
+                </span>
+              )}
             </div>
             <span className="flex items-center gap-1.5">
               <button
@@ -344,6 +369,17 @@ export default function TokenPage() {
                 )}
               </div>
             </div>
+            {position && position.qty > 0 && (
+              <div className="flex items-center gap-4 px-3 py-2 bg-bg-secondary/50 border-b border-border text-[10px]">
+                <span className="text-text-muted font-semibold uppercase tracking-wider text-[8px]">My Position</span>
+                <span className="font-mono text-text-secondary">Qty: <b className="text-text-primary">{formatNumber(position.qty, 4)}</b></span>
+                <span className="font-mono text-text-secondary">Avg Entry: <b className="text-text-primary">{formatPrice(position.avgEntryPrice)}</b></span>
+                <span className="font-mono text-text-secondary">Value: <b className="text-text-primary">${formatNumber(position.value, 2)}</b></span>
+                <span className={`font-mono font-bold ${position.unrealizedPnl >= 0 ? "text-accent-green" : "text-accent-red"}`}>
+                  P&L: {formatPnl(position.unrealizedPnl)} ({position.avgEntryPrice > 0 ? formatPercent(((position.currentPrice - position.avgEntryPrice) / position.avgEntryPrice) * 100) : "0%"})
+                </span>
+              </div>
+            )}
             {chartLoading && chartBars.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-[400px] text-text-muted bg-bg-card gap-3">
                 <div className="w-6 h-6 border-2 border-text-muted/30 border-t-accent-green rounded-full animate-spin" />
@@ -356,7 +392,7 @@ export default function TokenPage() {
                     No data for {range.toUpperCase()} — showing {fallbackRange?.toUpperCase()} instead
                   </div>
                 )}
-                <Chart data={chartBars} height={400} supply={t.supply} marketCap={t.marketCap} currentPrice={t.price} range={usingFallback ? fallbackRange! : range} />
+                <Chart data={chartBars} height={400} supply={t.supply} marketCap={t.marketCap} currentPrice={t.price} range={usingFallback ? fallbackRange! : range} avgEntryPrice={position?.avgEntryPrice} avgExitPrice={avgExitPrice} />
               </>
             ) : (
               <div className="flex flex-col items-center justify-center h-[400px] text-text-muted bg-bg-card gap-2">
