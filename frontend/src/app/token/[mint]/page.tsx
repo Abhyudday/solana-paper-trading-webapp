@@ -109,7 +109,7 @@ export default function TokenPage() {
 
   const { data: userTradesData } = useQuery({
     queryKey: ["userTrades"],
-    queryFn: () => api.portfolio.getTrades(200, 0),
+    queryFn: () => api.portfolio.getTrades(100, 0),
     enabled: isAuthenticated,
     staleTime: 2_000,
   });

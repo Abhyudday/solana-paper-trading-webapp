@@ -51,8 +51,15 @@ export async function limitOrderRoutes(app: FastifyInstance) {
       const { userId } = request.user as { userId: string };
       const q = request.query as Record<string, string>;
       const status = q.status as "open" | "filled" | "cancelled" | undefined;
-      const orders = await getUserLimitOrders(userId, status);
-      return reply.send({ orders });
+      try {
+        const orders = await getUserLimitOrders(userId, status);
+        return reply.send({ orders });
+      } catch (err: unknown) {
+        if (err instanceof Error && err.message.includes("does not exist")) {
+          return reply.send({ orders: [] });
+        }
+        throw err;
+      }
     }
   );
 

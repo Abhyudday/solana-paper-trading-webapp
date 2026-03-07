@@ -93,11 +93,18 @@ export async function getUserLimitOrders(userId: string, status?: OrderStatus) {
   const where: Record<string, unknown> = { userId };
   if (status) where.status = status;
 
-  return prisma.limitOrder.findMany({
-    where,
-    orderBy: { createdAt: "desc" },
-    take: 100,
-  });
+  try {
+    return await prisma.limitOrder.findMany({
+      where,
+      orderBy: { createdAt: "desc" },
+      take: 100,
+    });
+  } catch (err: unknown) {
+    if (err instanceof Error && err.message.includes("does not exist")) {
+      return [];
+    }
+    throw err;
+  }
 }
 
 /**
@@ -105,9 +112,17 @@ export async function getUserLimitOrders(userId: string, status?: OrderStatus) {
  * Called by the price poller on each tick.
  */
 export async function checkAndFillLimitOrders(): Promise<number> {
-  const openOrders = await prisma.limitOrder.findMany({
-    where: { status: "open" },
-  });
+  let openOrders;
+  try {
+    openOrders = await prisma.limitOrder.findMany({
+      where: { status: "open" },
+    });
+  } catch (err: unknown) {
+    if (err instanceof Error && err.message.includes("does not exist")) {
+      return 0;
+    }
+    throw err;
+  }
 
   if (openOrders.length === 0) return 0;
 
