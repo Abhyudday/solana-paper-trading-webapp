@@ -33,16 +33,14 @@ export default function TokenPage() {
   const { isAuthenticated } = useAuth();
   const [range, setRange] = useState<ChartRange>("15s");
   const [infoTab, setInfoTab] = useState<InfoTab>("info");
-  const [wsPrice, setWsPrice] = useState<number>(0);
-
   const queryClient = useQueryClient();
 
   const { data: tokenInfo, isLoading: tokenLoading, isFetched: tokenFetched } = useQuery({
     queryKey: ["token", mint],
     queryFn: () => api.market.getToken(mint),
     enabled: !!mint,
-    refetchInterval: 1_000,
-    staleTime: 500,
+    refetchInterval: 800,
+    staleTime: 300,
     placeholderData: keepPreviousData,
   });
 
@@ -163,7 +161,6 @@ export default function TokenPage() {
       if (msg.mint !== mint) return;
       const price = msg.price as number;
       if (!price || price <= 0) return;
-      setWsPrice(price);
       const nowSec = Math.floor(Date.now() / 1000);
       const currentBucket = Math.floor(nowSec / bucketSec) * bucketSec;
 
@@ -399,44 +396,13 @@ export default function TokenPage() {
                 )}
               </div>
             </div>
-            {(() => {
-              const livePrice = wsPrice > 0 ? wsPrice : t.price;
-              const hasOpenPosition = position && position.qty > 0;
-              const hasTrades = !!(avgEntryFromTrades || avgExitPrice);
-              if (!hasOpenPosition && !hasTrades) return null;
-
-              if (hasOpenPosition) {
-                const entry = position.avgEntryPrice;
-                const livePnl = (livePrice - entry) * position.qty;
-                const liveRoi = entry > 0 ? ((livePrice - entry) / entry) * 100 : 0;
-                return (
-                  <div className="flex items-center gap-4 px-3 py-2 bg-bg-secondary/50 border-b border-border text-[10px]">
-                    <span className="text-text-muted font-semibold uppercase tracking-wider text-[8px]">My Position</span>
-                    <span className="font-mono text-text-secondary">Qty: <b className="text-text-primary">{formatNumber(position.qty, 4)}</b></span>
-                    <span className="font-mono text-text-secondary">Avg Entry: <b className="text-text-primary">{formatPrice(entry)}</b></span>
-                    <span className="font-mono text-text-secondary">Value: <b className="text-text-primary">${formatNumber(livePrice * position.qty, 2)}</b></span>
-                    <span className={`font-mono font-bold ${livePnl >= 0 ? "text-accent-green" : "text-accent-red"}`}>
-                      P&L: {formatPnl(livePnl)} ({formatPercent(liveRoi)})
-                    </span>
-                  </div>
-                );
-              }
-
-              if (hasTrades && avgEntryFromTrades && avgExitPrice) {
-                const realizedRoi = avgEntryFromTrades > 0 ? ((avgExitPrice - avgEntryFromTrades) / avgEntryFromTrades) * 100 : 0;
-                return (
-                  <div className="flex items-center gap-4 px-3 py-2 bg-bg-secondary/50 border-b border-border text-[10px]">
-                    <span className="text-text-muted font-semibold uppercase tracking-wider text-[8px]">Closed Position</span>
-                    <span className="font-mono text-text-secondary">Avg Entry: <b className="text-text-primary">{formatPrice(avgEntryFromTrades)}</b></span>
-                    <span className="font-mono text-text-secondary">Avg Exit: <b className="text-text-primary">{formatPrice(avgExitPrice)}</b></span>
-                    <span className={`font-mono font-bold ${realizedRoi >= 0 ? "text-accent-green" : "text-accent-red"}`}>
-                      Return: {formatPercent(realizedRoi)}
-                    </span>
-                  </div>
-                );
-              }
-              return null;
-            })()}
+            <PositionBanner
+              mint={mint}
+              position={position}
+              avgEntryFromTrades={avgEntryFromTrades}
+              avgExitPrice={avgExitPrice}
+              apiPrice={t.price}
+            />
             {chartLoading && chartBars.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-[400px] text-text-muted bg-bg-card gap-3">
                 <div className="w-6 h-6 border-2 border-text-muted/30 border-t-accent-green rounded-full animate-spin" />
@@ -542,6 +508,91 @@ export default function TokenPage() {
       </div>
     </div>
   );
+}
+
+function PositionBanner({
+  mint,
+  position,
+  avgEntryFromTrades,
+  avgExitPrice,
+  apiPrice,
+}: {
+  mint: string;
+  position?: { qty: number; avgEntryPrice: number } | null;
+  avgEntryFromTrades?: number;
+  avgExitPrice?: number;
+  apiPrice: number;
+}) {
+  const livePriceRef = useRef<number>(apiPrice);
+  const [livePrice, setLivePrice] = useState<number>(apiPrice);
+  const [, setTick] = useState(0);
+
+  useEffect(() => {
+    if (apiPrice > 0) {
+      livePriceRef.current = apiPrice;
+      setLivePrice(apiPrice);
+    }
+  }, [apiPrice]);
+
+  useEffect(() => {
+    const unsub = wsClient.on("price", (msg) => {
+      if (msg.mint !== mint) return;
+      const p = msg.price as number;
+      if (p > 0) {
+        livePriceRef.current = p;
+        setLivePrice(p);
+      }
+    });
+    return unsub;
+  }, [mint]);
+
+  useEffect(() => {
+    const id = setInterval(() => {
+      const p = livePriceRef.current;
+      if (p > 0) setLivePrice(p);
+      setTick(t => t + 1);
+    }, 500);
+    return () => clearInterval(id);
+  }, []);
+
+  const displayPrice = livePrice > 0 ? livePrice : apiPrice;
+  const hasOpenPosition = position && position.qty > 0;
+  const hasTrades = !!(avgEntryFromTrades || avgExitPrice);
+
+  if (!hasOpenPosition && !hasTrades) return null;
+
+  if (hasOpenPosition) {
+    const entry = position.avgEntryPrice;
+    const livePnl = (displayPrice - entry) * position.qty;
+    const liveRoi = entry > 0 ? ((displayPrice - entry) / entry) * 100 : 0;
+    return (
+      <div className="flex items-center gap-4 px-3 py-2 bg-bg-secondary/50 border-b border-border text-[10px]">
+        <span className="text-text-muted font-semibold uppercase tracking-wider text-[8px]">My Position</span>
+        <span className="font-mono text-text-secondary">Qty: <b className="text-text-primary">{formatNumber(position.qty, 4)}</b></span>
+        <span className="font-mono text-text-secondary">Avg Entry: <b className="text-text-primary">{formatPrice(entry)}</b></span>
+        <span className="font-mono text-text-secondary">Value: <b className="text-text-primary">${formatNumber(displayPrice * position.qty, 2)}</b></span>
+        <span className={`font-mono font-bold ${livePnl >= 0 ? "text-accent-green" : "text-accent-red"}`}>
+          P&L: {formatPnl(livePnl)} ({formatPercent(liveRoi)})
+        </span>
+      </div>
+    );
+  }
+
+  if (hasTrades && avgEntryFromTrades && avgExitPrice) {
+    const realizedRoi = avgEntryFromTrades > 0 ? ((avgExitPrice - avgEntryFromTrades) / avgEntryFromTrades) * 100 : 0;
+    return (
+      <div className="flex items-center gap-4 px-3 py-2 bg-bg-secondary/50 border-b border-border text-[10px]">
+        <span className="text-text-muted font-semibold uppercase tracking-wider text-[8px]">Closed Position</span>
+        <span className="font-mono text-text-secondary">Avg Entry: <b className="text-text-primary">{formatPrice(avgEntryFromTrades)}</b></span>
+        <span className="font-mono text-text-secondary">Avg Exit: <b className="text-text-primary">{formatPrice(avgExitPrice)}</b></span>
+        <span className={`font-mono font-bold ${realizedRoi >= 0 ? "text-accent-green" : "text-accent-red"}`}>
+          Return: {formatPercent(realizedRoi)}
+        </span>
+      </div>
+    );
+  }
+
+  return null;
 }
 
 function StatItem({ label, value, highlight }: { label: string; value: string; highlight?: boolean }) {
