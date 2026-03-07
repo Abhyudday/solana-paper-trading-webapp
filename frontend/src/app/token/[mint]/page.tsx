@@ -33,6 +33,7 @@ export default function TokenPage() {
   const { isAuthenticated } = useAuth();
   const [range, setRange] = useState<ChartRange>("15s");
   const [infoTab, setInfoTab] = useState<InfoTab>("info");
+  const [wsPrice, setWsPrice] = useState<number>(0);
 
   const queryClient = useQueryClient();
 
@@ -69,7 +70,18 @@ export default function TokenPage() {
     retry: 2,
   });
 
-  const fallbackRange = range === "15s" ? "1m" : range === "1m" ? "5m" : range === "5m" ? "15m" : null;
+  const fallbackRange: ChartRange | null = (() => {
+    switch (range) {
+      case "1s": return "5s";
+      case "5s": return "15s";
+      case "15s": return "1m";
+      case "30s": return "1m";
+      case "1m": return "5m";
+      case "5m": return "15m";
+      case "15m": return "30m";
+      default: return null;
+    }
+  })();
   const { data: fallbackChartData } = useQuery({
     queryKey: ["chart", mint, fallbackRange],
     queryFn: () => api.market.getChart(mint, fallbackRange!),
@@ -151,6 +163,7 @@ export default function TokenPage() {
       if (msg.mint !== mint) return;
       const price = msg.price as number;
       if (!price || price <= 0) return;
+      setWsPrice(price);
       const nowSec = Math.floor(Date.now() / 1000);
       const currentBucket = Math.floor(nowSec / bucketSec) * bucketSec;
 
@@ -202,6 +215,15 @@ export default function TokenPage() {
   }
   const chartBars = rawChartBars.length > 0 ? rawChartBars : lastGoodBarsRef.current;
 
+  const avgEntryFromTrades = useMemo(() => {
+    if (!userTradesData?.trades) return undefined;
+    const buyTrades = userTradesData.trades.filter((tr) => tr.mint === mint && tr.side === "buy");
+    if (buyTrades.length === 0) return undefined;
+    const totalQty = buyTrades.reduce((sum, tr) => sum + tr.qty, 0);
+    const totalValue = buyTrades.reduce((sum, tr) => sum + tr.qty * tr.price, 0);
+    return totalQty > 0 ? totalValue / totalQty : undefined;
+  }, [userTradesData, mint]);
+
   const avgExitPrice = useMemo(() => {
     if (!userTradesData?.trades) return undefined;
     const sellTrades = userTradesData.trades.filter((tr) => tr.mint === mint && tr.side === "sell");
@@ -210,6 +232,8 @@ export default function TokenPage() {
     const totalValue = sellTrades.reduce((sum, tr) => sum + tr.qty * tr.price, 0);
     return totalQty > 0 ? totalValue / totalQty : undefined;
   }, [userTradesData, mint]);
+
+  const effectiveAvgEntry = position?.avgEntryPrice ?? avgEntryFromTrades;
 
   if (!tokenInfo && tokenFetched && !tokenLoading) {
     return (
@@ -375,22 +399,43 @@ export default function TokenPage() {
                 )}
               </div>
             </div>
-            {position && position.qty > 0 && (() => {
-              const livePrice = t.price;
-              const liveValue = livePrice * position.qty;
-              const livePnl = (livePrice - position.avgEntryPrice) * position.qty;
-              const liveRoi = position.avgEntryPrice > 0 ? ((livePrice - position.avgEntryPrice) / position.avgEntryPrice) * 100 : 0;
-              return (
-                <div className="flex items-center gap-4 px-3 py-2 bg-bg-secondary/50 border-b border-border text-[10px]">
-                  <span className="text-text-muted font-semibold uppercase tracking-wider text-[8px]">My Position</span>
-                  <span className="font-mono text-text-secondary">Qty: <b className="text-text-primary">{formatNumber(position.qty, 4)}</b></span>
-                  <span className="font-mono text-text-secondary">Avg Entry: <b className="text-text-primary">{formatPrice(position.avgEntryPrice)}</b></span>
-                  <span className="font-mono text-text-secondary">Value: <b className="text-text-primary">${formatNumber(liveValue, 2)}</b></span>
-                  <span className={`font-mono font-bold ${livePnl >= 0 ? "text-accent-green" : "text-accent-red"}`}>
-                    P&L: {formatPnl(livePnl)} ({formatPercent(liveRoi)})
-                  </span>
-                </div>
-              );
+            {(() => {
+              const livePrice = wsPrice > 0 ? wsPrice : t.price;
+              const hasOpenPosition = position && position.qty > 0;
+              const hasTrades = !!(avgEntryFromTrades || avgExitPrice);
+              if (!hasOpenPosition && !hasTrades) return null;
+
+              if (hasOpenPosition) {
+                const entry = position.avgEntryPrice;
+                const livePnl = (livePrice - entry) * position.qty;
+                const liveRoi = entry > 0 ? ((livePrice - entry) / entry) * 100 : 0;
+                return (
+                  <div className="flex items-center gap-4 px-3 py-2 bg-bg-secondary/50 border-b border-border text-[10px]">
+                    <span className="text-text-muted font-semibold uppercase tracking-wider text-[8px]">My Position</span>
+                    <span className="font-mono text-text-secondary">Qty: <b className="text-text-primary">{formatNumber(position.qty, 4)}</b></span>
+                    <span className="font-mono text-text-secondary">Avg Entry: <b className="text-text-primary">{formatPrice(entry)}</b></span>
+                    <span className="font-mono text-text-secondary">Value: <b className="text-text-primary">${formatNumber(livePrice * position.qty, 2)}</b></span>
+                    <span className={`font-mono font-bold ${livePnl >= 0 ? "text-accent-green" : "text-accent-red"}`}>
+                      P&L: {formatPnl(livePnl)} ({formatPercent(liveRoi)})
+                    </span>
+                  </div>
+                );
+              }
+
+              if (hasTrades && avgEntryFromTrades && avgExitPrice) {
+                const realizedRoi = avgEntryFromTrades > 0 ? ((avgExitPrice - avgEntryFromTrades) / avgEntryFromTrades) * 100 : 0;
+                return (
+                  <div className="flex items-center gap-4 px-3 py-2 bg-bg-secondary/50 border-b border-border text-[10px]">
+                    <span className="text-text-muted font-semibold uppercase tracking-wider text-[8px]">Closed Position</span>
+                    <span className="font-mono text-text-secondary">Avg Entry: <b className="text-text-primary">{formatPrice(avgEntryFromTrades)}</b></span>
+                    <span className="font-mono text-text-secondary">Avg Exit: <b className="text-text-primary">{formatPrice(avgExitPrice)}</b></span>
+                    <span className={`font-mono font-bold ${realizedRoi >= 0 ? "text-accent-green" : "text-accent-red"}`}>
+                      Return: {formatPercent(realizedRoi)}
+                    </span>
+                  </div>
+                );
+              }
+              return null;
             })()}
             {chartLoading && chartBars.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-[400px] text-text-muted bg-bg-card gap-3">
@@ -404,7 +449,7 @@ export default function TokenPage() {
                     No data for {range.toUpperCase()} — showing {fallbackRange?.toUpperCase()} instead
                   </div>
                 )}
-                <Chart data={chartBars} height={400} supply={t.supply} marketCap={t.marketCap} currentPrice={t.price} range={usingFallback ? fallbackRange! : range} avgEntryPrice={position?.avgEntryPrice} avgExitPrice={avgExitPrice} />
+                <Chart data={chartBars} height={400} supply={t.supply} marketCap={t.marketCap} currentPrice={t.price} range={usingFallback ? fallbackRange! : range} avgEntryPrice={effectiveAvgEntry} avgExitPrice={avgExitPrice} />
               </>
             ) : (
               <div className="flex flex-col items-center justify-center h-[400px] text-text-muted bg-bg-card gap-2">
