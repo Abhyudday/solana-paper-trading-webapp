@@ -39,7 +39,7 @@ export async function marketRoutes(app: FastifyInstance) {
         info.price = freshPrice;
       }
     }
-    reply.header("Cache-Control", "no-cache, no-store");
+    reply.header("Cache-Control", "public, max-age=2, stale-while-revalidate=5");
     return reply.send(info);
   });
 
@@ -52,8 +52,8 @@ export async function marketRoutes(app: FastifyInstance) {
     const bars = await adapter.getOHLCV(mint, parsed.data.range);
     const isSubMinute = ["1s", "5s", "15s", "30s"].includes(parsed.data.range);
     reply.header("Cache-Control", isSubMinute
-      ? "public, max-age=2, stale-while-revalidate=5"
-      : "public, max-age=10, stale-while-revalidate=20"
+      ? "public, max-age=3, stale-while-revalidate=8"
+      : "public, max-age=15, stale-while-revalidate=30"
     );
     return reply.send({ bars });
   });
@@ -78,28 +78,28 @@ export async function marketRoutes(app: FastifyInstance) {
   app.get("/api/market/top", async (_request, reply) => {
     const tokens = await adapter.getTopTokens(50);
     await addDexPaid(tokens);
-    reply.header("Cache-Control", "public, max-age=5, stale-while-revalidate=15");
+    reply.header("Cache-Control", "public, max-age=10, stale-while-revalidate=30");
     return reply.send({ tokens });
   });
 
   app.get("/api/market/latest", async (_request, reply) => {
     const tokens = await adapter.getLatestTokens(50);
     await addDexPaid(tokens);
-    reply.header("Cache-Control", "public, max-age=5, stale-while-revalidate=15");
+    reply.header("Cache-Control", "public, max-age=10, stale-while-revalidate=30");
     return reply.send({ tokens });
   });
 
   app.get("/api/market/trending", async (_request, reply) => {
     const tokens = await adapter.getTrendingTokens(50);
     await addDexPaid(tokens);
-    reply.header("Cache-Control", "public, max-age=5, stale-while-revalidate=15");
+    reply.header("Cache-Control", "public, max-age=10, stale-while-revalidate=30");
     return reply.send({ tokens });
   });
 
   app.get("/api/market/tokens/:mint/trades", async (request, reply) => {
     const { mint } = request.params as { mint: string };
     const trades = await adapter.getTokenTrades(mint);
-    reply.header("Cache-Control", "public, max-age=3, stale-while-revalidate=7");
+    reply.header("Cache-Control", "public, max-age=8, stale-while-revalidate=15");
     return reply.send({ trades });
   });
 
@@ -127,14 +127,14 @@ export async function marketRoutes(app: FastifyInstance) {
   app.get("/api/market/graduating", async (_request, reply) => {
     const tokens = await adapter.getGraduatingTokens(50);
     await addDexPaid(tokens);
-    reply.header("Cache-Control", "public, max-age=5, stale-while-revalidate=15");
+    reply.header("Cache-Control", "public, max-age=10, stale-while-revalidate=30");
     return reply.send({ tokens });
   });
 
   app.get("/api/market/graduated", async (_request, reply) => {
     const tokens = await adapter.getGraduatedTokens(50);
     await addDexPaid(tokens);
-    reply.header("Cache-Control", "public, max-age=5, stale-while-revalidate=15");
+    reply.header("Cache-Control", "public, max-age=10, stale-while-revalidate=30");
     return reply.send({ tokens });
   });
 
@@ -176,7 +176,7 @@ export async function marketRoutes(app: FastifyInstance) {
     );
 
     const tokens = await adapter.getFilteredTokens(cleaned);
-    reply.header("Cache-Control", "public, max-age=5, stale-while-revalidate=15");
+    reply.header("Cache-Control", "public, max-age=10, stale-while-revalidate=30");
     return reply.send({ tokens });
   });
 }

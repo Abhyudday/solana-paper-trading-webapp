@@ -43,8 +43,8 @@ export function Transactions({ mint }: TransactionsProps) {
   const { data, isFetching } = useQuery({
     queryKey: ["tokenTrades", mint],
     queryFn: () => api.market.getTokenTrades(mint),
-    refetchInterval: 5_000,
-    staleTime: 3_000,
+    refetchInterval: 10_000,
+    staleTime: 5_000,
     placeholderData: keepPreviousData,
   });
 

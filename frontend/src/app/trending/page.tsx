@@ -139,8 +139,8 @@ export default function TrendingPage() {
   const { data: trendingData, isLoading } = useQuery({
     queryKey: ["trendingTokens"],
     queryFn: () => api.market.getTrendingTokens(),
-    refetchInterval: 5_000,
-    staleTime: 3_000,
+    refetchInterval: 12_000,
+    staleTime: 6_000,
     refetchOnWindowFocus: false,
     placeholderData: keepPreviousData,
   });

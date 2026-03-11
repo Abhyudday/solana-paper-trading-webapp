@@ -55,10 +55,10 @@ function calculateRiskScore(bundled: boolean, bundlePercentage: number, bundleCo
   return { score, level };
 }
 
-const CACHE_TTL_PRICE = 5; // seconds
-const CACHE_TTL_INFO = 15;
-const CACHE_TTL_TOP = 30;
-const CACHE_TTL_CHART = 5;
+const CACHE_TTL_PRICE = 15; // seconds
+const CACHE_TTL_INFO = 45;
+const CACHE_TTL_TOP = 60;
+const CACHE_TTL_CHART = 15;
 
 async function fetchApi<T>(path: string, params?: Record<string, string>): Promise<T> {
   const url = new URL(path, config.SOLANA_TRACKER_BASE_URL);
@@ -217,7 +217,7 @@ export class SolanaTrackerAdapter implements MarketDataAdapter {
       if (parsed.dexPaid === undefined) {
         parsed.dexPaid = await checkDexPaid(mint);
       }
-      memCache.set(`ti:${mint}`, parsed, 3);
+      memCache.set(`ti:${mint}`, parsed, 10);
       return parsed;
     }
 
@@ -261,7 +261,7 @@ export class SolanaTrackerAdapter implements MarketDataAdapter {
         dexPaid,
       };
 
-      memCache.set(`ti:${mint}`, info, 3);
+      memCache.set(`ti:${mint}`, info, 10);
       await safeSet(CACHE_KEYS.tokenInfo(mint), JSON.stringify(info), "EX", CACHE_TTL_INFO);
       await safeSet(CACHE_KEYS.tokenPrice(mint), String(info.price), "EX", CACHE_TTL_PRICE);
 
@@ -275,8 +275,8 @@ export class SolanaTrackerAdapter implements MarketDataAdapter {
     const cacheKey = `chart:${mint}:${range}`;
     const isUltraShort = ["1s", "5s", "15s"].includes(range);
     const isShortRange = ["30s", "1m"].includes(range);
-    const memTtl = isUltraShort ? 0 : isShortRange ? 1 : 8;
-    const redisTtl = isUltraShort ? 1 : isShortRange ? 3 : CACHE_TTL_CHART;
+    const memTtl = isUltraShort ? 2 : isShortRange ? 5 : 15;
+    const redisTtl = isUltraShort ? 5 : isShortRange ? 10 : CACHE_TTL_CHART;
 
     // Skip memCache for ultra-short to always get freshest from Redis/API
     if (!isUltraShort) {
@@ -336,7 +336,7 @@ export class SolanaTrackerAdapter implements MarketDataAdapter {
     const cached = await safeGet(CACHE_KEYS.topTokens());
     if (cached) {
       const parsed = JSON.parse(cached) as TokenInfo[];
-      memCache.set("market:top", parsed, 10);
+      memCache.set("market:top", parsed, 30);
       return parsed.slice(0, limit);
     }
 
@@ -371,7 +371,7 @@ export class SolanaTrackerAdapter implements MarketDataAdapter {
           };
         });
 
-      memCache.set("market:top", tokens, 10);
+      memCache.set("market:top", tokens, 30);
       await safeSet(CACHE_KEYS.topTokens(), JSON.stringify(tokens), "EX", CACHE_TTL_TOP);
       return tokens;
     } catch {
@@ -387,7 +387,7 @@ export class SolanaTrackerAdapter implements MarketDataAdapter {
     const cached = await safeGet(cacheKey);
     if (cached) {
       const parsed = JSON.parse(cached) as TokenInfo[];
-      memCache.set(cacheKey, parsed, 5);
+      memCache.set(cacheKey, parsed, 20);
       return parsed.slice(0, limit);
     }
 
@@ -422,8 +422,8 @@ export class SolanaTrackerAdapter implements MarketDataAdapter {
           };
         });
 
-      memCache.set(cacheKey, tokens, 5);
-      await safeSet(cacheKey, JSON.stringify(tokens), "EX", 30);
+      memCache.set(cacheKey, tokens, 20);
+      await safeSet(cacheKey, JSON.stringify(tokens), "EX", 60);
       return tokens;
     } catch {
       const stale = await safeGet(cacheKey);
@@ -440,7 +440,7 @@ export class SolanaTrackerAdapter implements MarketDataAdapter {
     const cached = await safeGet(cacheKey);
     if (cached) {
       const parsed = JSON.parse(cached) as TokenInfo[];
-      memCache.set(cacheKey, parsed, 5);
+      memCache.set(cacheKey, parsed, 20);
       return parsed.slice(0, limit);
     }
 
@@ -475,8 +475,8 @@ export class SolanaTrackerAdapter implements MarketDataAdapter {
           };
         });
 
-      memCache.set(cacheKey, tokens, 5);
-      await safeSet(cacheKey, JSON.stringify(tokens), "EX", 30);
+      memCache.set(cacheKey, tokens, 20);
+      await safeSet(cacheKey, JSON.stringify(tokens), "EX", 60);
       return tokens;
     } catch {
       const stale = await safeGet(cacheKey);
@@ -493,7 +493,7 @@ export class SolanaTrackerAdapter implements MarketDataAdapter {
     const cached = await safeGet(cacheKey);
     if (cached) {
       const parsed = JSON.parse(cached) as TokenTrade[];
-      memCache.set(cacheKey, parsed, 10);
+      memCache.set(cacheKey, parsed, 20);
       return parsed;
     }
 
@@ -522,8 +522,8 @@ export class SolanaTrackerAdapter implements MarketDataAdapter {
         time: t.time || 0,
       }));
 
-      memCache.set(cacheKey, trades, 10);
-      await safeSet(cacheKey, JSON.stringify(trades), "EX", 15);
+      memCache.set(cacheKey, trades, 20);
+      await safeSet(cacheKey, JSON.stringify(trades), "EX", 30);
       return trades;
     } catch {
       return [];
@@ -538,7 +538,7 @@ export class SolanaTrackerAdapter implements MarketDataAdapter {
     const cached = await safeGet(cacheKey);
     if (cached) {
       const parsed = JSON.parse(cached) as TokenInfo[];
-      memCache.set(cacheKey, parsed, 5);
+      memCache.set(cacheKey, parsed, 20);
       return parsed.slice(0, limit);
     }
 
@@ -662,8 +662,8 @@ export class SolanaTrackerAdapter implements MarketDataAdapter {
     }
 
     if (tokens.length > 0) {
-      memCache.set(cacheKey, tokens, 5);
-      await safeSet(cacheKey, JSON.stringify(tokens), "EX", 15);
+      memCache.set(cacheKey, tokens, 20);
+      await safeSet(cacheKey, JSON.stringify(tokens), "EX", 45);
     } else {
       const stale = await safeGet(cacheKey);
       if (stale) return (JSON.parse(stale) as TokenInfo[]).slice(0, limit);
@@ -679,7 +679,7 @@ export class SolanaTrackerAdapter implements MarketDataAdapter {
     const cached = await safeGet(cacheKey);
     if (cached) {
       const parsed = JSON.parse(cached) as TokenInfo[];
-      memCache.set(cacheKey, parsed, 5);
+      memCache.set(cacheKey, parsed, 20);
       return parsed.slice(0, limit);
     }
 
@@ -715,8 +715,8 @@ export class SolanaTrackerAdapter implements MarketDataAdapter {
         });
 
       if (tokens.length > 0) {
-        memCache.set(cacheKey, tokens, 5);
-        await safeSet(cacheKey, JSON.stringify(tokens), "EX", 30);
+        memCache.set(cacheKey, tokens, 20);
+        await safeSet(cacheKey, JSON.stringify(tokens), "EX", 60);
       }
       return tokens;
     } catch {
@@ -756,6 +756,18 @@ export class SolanaTrackerAdapter implements MarketDataAdapter {
     if (filters.minCreatedAt !== undefined) params.minCreatedAt = String(filters.minCreatedAt);
     if (filters.maxCreatedAt !== undefined) params.maxCreatedAt = String(filters.maxCreatedAt);
 
+    const sortedKeys = Object.keys(params).sort();
+    const cacheKey = `filtered:${sortedKeys.map((k) => `${k}=${params[k]}`).join("&")}`;
+    const memHit = memCache.get<FilteredTokenItem[]>(cacheKey);
+    if (memHit) return memHit;
+
+    const cached = await safeGet(cacheKey);
+    if (cached) {
+      const parsed = JSON.parse(cached) as FilteredTokenItem[];
+      memCache.set(cacheKey, parsed, 15);
+      return parsed;
+    }
+
     try {
       const data = await fetchApi<{
         status?: string;
@@ -780,7 +792,7 @@ export class SolanaTrackerAdapter implements MarketDataAdapter {
       }>("search", params);
 
       const items = data.data || (Array.isArray(data) ? data as unknown[] : []);
-      return (items as Array<{
+      const result = (items as Array<{
         mint?: string;
         symbol?: string;
         name?: string;
@@ -816,6 +828,12 @@ export class SolanaTrackerAdapter implements MarketDataAdapter {
           feesTotal: item.fees?.total,
           createdAt: item.createdAt,
         }));
+
+      if (result.length > 0) {
+        memCache.set(cacheKey, result, 15);
+        await safeSet(cacheKey, JSON.stringify(result), "EX", 30);
+      }
+      return result;
     } catch {
       return [];
     }

@@ -39,22 +39,22 @@ export default function TokenPage() {
     queryKey: ["token", mint],
     queryFn: () => api.market.getToken(mint),
     enabled: !!mint,
-    refetchInterval: 800,
-    staleTime: 300,
+    refetchInterval: 3_000,
+    staleTime: 1_500,
     placeholderData: keepPreviousData,
   });
 
   const isShortRange = ["1s", "5s", "15s", "30s", "1m"].includes(range);
   const chartRefetchInterval = (() => {
     switch (range) {
-      case "1s": return 1_000;
-      case "5s": return 1_000;
-      case "15s": return 1_000;
-      case "30s": return 2_000;
-      case "1m": return 2_000;
-      case "5m": return 5_000;
-      case "15m": return 10_000;
-      default: return 15_000;
+      case "1s": return 3_000;
+      case "5s": return 5_000;
+      case "15s": return 5_000;
+      case "30s": return 8_000;
+      case "1m": return 10_000;
+      case "5m": return 15_000;
+      case "15m": return 30_000;
+      default: return 60_000;
     }
   })();
 
@@ -63,7 +63,7 @@ export default function TokenPage() {
     queryFn: () => api.market.getChart(mint, range),
     enabled: !!mint,
     refetchInterval: chartRefetchInterval,
-    staleTime: isShortRange ? 500 : 5_000,
+    staleTime: isShortRange ? 2_000 : 10_000,
     placeholderData: keepPreviousData,
     retry: 2,
   });

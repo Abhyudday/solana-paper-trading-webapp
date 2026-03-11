@@ -5,7 +5,7 @@ import { memCache } from "../lib/mem-cache";
 import { prisma } from "../lib/prisma";
 import { checkAndFillLimitOrders } from "../services/limit-order";
 
-const POLL_INTERVAL_MS = 2000;
+const POLL_INTERVAL_MS = 5000;
 
 const adapter = new SolanaTrackerAdapter();
 
@@ -40,10 +40,9 @@ export async function startPricePoller() {
 
       for (const mint of mints) {
         try {
-          memCache.delete(`ti:${mint}`);
           const info = await adapter.getTokenInfo(mint);
           if (info && info.price > 0) {
-            await safeSet(CACHE_KEYS.tokenPrice(mint), String(info.price), "EX", 30);
+            await safeSet(CACHE_KEYS.tokenPrice(mint), String(info.price), "EX", 60);
             await safePublish(
               CHANNELS.priceUpdate,
               JSON.stringify({ mint, price: info.price, timestamp: Date.now() })
