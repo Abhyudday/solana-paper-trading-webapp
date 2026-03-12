@@ -1,26 +1,17 @@
 "use client";
 
-import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useWallet } from "@solana/wallet-adapter-react";
-import { WalletMultiButton } from "@solana/wallet-adapter-react-ui";
-import { useAuth } from "@/context/AuthContext";
 import { SearchBar } from "./SearchBar";
-import { shortenAddress } from "@/lib/format";
 
 const NAV_ITEMS = [
   { href: "/", label: "Trenches", icon: "M13 10V3L4 14h7v7l9-11h-7z" },
   { href: "/trending", label: "Trending", icon: "M17.657 18.657A8 8 0 016.343 7.343S7 9 9 10c0-2 .5-5 2.986-7C14 5 16.09 5.777 17.656 7.343A7.975 7.975 0 0120 13a7.975 7.975 0 01-2.343 5.657z" },
-  { href: "/portfolio", label: "Portfolio", auth: true, icon: "M21 12a2.25 2.25 0 00-2.25-2.25H15a3 3 0 11-6 0H5.25A2.25 2.25 0 003 12m18 0v6a2.25 2.25 0 01-2.25 2.25H5.25A2.25 2.25 0 013 18v-6m18 0V9M3 12V9m18 0a2.25 2.25 0 00-2.25-2.25H5.25A2.25 2.25 0 013 9m18 0V6a2.25 2.25 0 00-2.25-2.25H5.25A2.25 2.25 0 013 6v3" },
+  { href: "/portfolio", label: "Portfolio", icon: "M21 12a2.25 2.25 0 00-2.25-2.25H15a3 3 0 11-6 0H5.25A2.25 2.25 0 003 12m18 0v6a2.25 2.25 0 01-2.25 2.25H5.25A2.25 2.25 0 013 18v-6m18 0V9M3 12V9m18 0a2.25 2.25 0 00-2.25-2.25H5.25A2.25 2.25 0 013 9m18 0V6a2.25 2.25 0 00-2.25-2.25H5.25A2.25 2.25 0 013 6v3" },
 ];
 
 export function Navbar() {
   const pathname = usePathname();
-  const { publicKey } = useWallet();
-  const { isAuthenticated } = useAuth();
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => setMounted(true), []);
 
   return (
     <nav className="sticky top-0 z-50 border-b border-border bg-bg-secondary/90 backdrop-blur-xl" role="navigation" aria-label="Main navigation">
@@ -39,7 +30,7 @@ export function Navbar() {
 
         {/* Nav Tabs */}
         <div className="flex items-center gap-0.5 mr-4">
-          {NAV_ITEMS.filter(item => !item.auth || isAuthenticated).map((item) => {
+          {NAV_ITEMS.map((item) => {
             const isActive = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
             return (
               <Link
@@ -63,19 +54,6 @@ export function Navbar() {
         {/* Search */}
         <div className="flex-1 max-w-lg">
           <SearchBar />
-        </div>
-
-        {/* Right side */}
-        <div className="flex items-center gap-2 ml-auto pl-3">
-          {isAuthenticated && publicKey && (
-            <div className="flex items-center gap-1.5 text-[10px] font-mono bg-bg-tertiary/50 border border-border px-2.5 py-1.5 rounded-lg">
-              <span className="h-1.5 w-1.5 rounded-full bg-accent-green live-dot" />
-              <span className="text-text-secondary">{shortenAddress(publicKey.toBase58())}</span>
-            </div>
-          )}
-          {mounted && (
-            <WalletMultiButton className="!bg-accent-green !text-bg-primary !h-8 !text-[11px] !rounded-lg !font-bold !px-4 hover:!shadow-glow transition-all !border-0" />
-          )}
         </div>
       </div>
     </nav>

@@ -3,7 +3,6 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, TokenInfo, LimitOrderResult } from "@/lib/api";
-import { useAuth } from "@/context/AuthContext";
 import { formatUSD, formatPrice } from "@/lib/format";
 
 interface OrderPanelProps {
@@ -23,7 +22,6 @@ const ORDER_MODES: { key: OrderMode; label: string }[] = [
 ];
 
 export function OrderPanel({ token, usdcBalance, tokenQty }: OrderPanelProps) {
-  const { isAuthenticated } = useAuth();
   const queryClient = useQueryClient();
   const [side, setSide] = useState<"buy" | "sell">("buy");
   const [orderMode, setOrderMode] = useState<OrderMode>("market");
@@ -36,7 +34,6 @@ export function OrderPanel({ token, usdcBalance, tokenQty }: OrderPanelProps) {
   const { data: ordersData } = useQuery({
     queryKey: ["limitOrders", "open"],
     queryFn: () => api.orders.getAll("open"),
-    enabled: isAuthenticated,
     refetchInterval: 10_000,
   });
 
@@ -193,8 +190,7 @@ export function OrderPanel({ token, usdcBalance, tokenQty }: OrderPanelProps) {
                 placeholder={formatPrice(token.price)}
                 className="flex-1 bg-transparent px-3 py-2 text-[11px] font-mono outline-none text-text-primary"
                 aria-label="Trigger price"
-                disabled={!isAuthenticated}
-              />
+                />
               <span className="text-[9px] text-text-muted px-3 font-semibold">USD</span>
             </div>
             <button
@@ -224,7 +220,6 @@ export function OrderPanel({ token, usdcBalance, tokenQty }: OrderPanelProps) {
               placeholder="0.00"
               className="flex-1 bg-transparent px-3 py-2 text-[11px] font-mono outline-none text-text-primary"
               aria-label={`Amount in ${!isLimitMode && side === "buy" ? "USDC" : token.symbol}`}
-              disabled={!isAuthenticated}
             />
             <span className="text-[9px] text-text-muted px-3 font-semibold">
               {!isLimitMode && side === "buy" ? "USDC" : isLimitMode ? token.symbol : token.symbol}
@@ -326,7 +321,7 @@ export function OrderPanel({ token, usdcBalance, tokenQty }: OrderPanelProps) {
 
         <button
           type="submit"
-          disabled={!isAuthenticated || isPending}
+          disabled={isPending}
           className={`w-full py-2.5 rounded-lg text-[11px] font-bold transition-all duration-200 disabled:opacity-40 disabled:cursor-not-allowed ${
             side === "buy"
               ? "bg-accent-green text-bg-primary hover:shadow-glow"
@@ -335,8 +330,6 @@ export function OrderPanel({ token, usdcBalance, tokenQty }: OrderPanelProps) {
         >
           {isPending
             ? "Processing..."
-            : !isAuthenticated
-            ? "Connect Wallet"
             : isLimitMode
             ? `Place ${orderMode === "limit" ? "Limit" : orderMode === "stop_loss" ? "Stop Loss" : "Take Profit"} ${side === "buy" ? "Buy" : "Sell"}`
             : `${side === "buy" ? "Buy" : "Sell"} ${token.symbol}`}

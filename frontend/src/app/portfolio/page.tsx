@@ -2,7 +2,6 @@
 
 import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { useAuth } from "@/context/AuthContext";
 import { api, PortfolioAnalytics, LimitOrderResult } from "@/lib/api";
 import { formatUSD, formatPnl, formatPercent, formatPrice, formatNumber, timeAgo, shortenAddress } from "@/lib/format";
 import Link from "next/link";
@@ -10,34 +9,30 @@ import Link from "next/link";
 type Tab = "holding" | "history" | "analytics" | "orders";
 
 export default function PortfolioPage() {
-  const { isAuthenticated } = useAuth();
   const [tab, setTab] = useState<Tab>("holding");
 
   const { data: portfolio, isLoading } = useQuery({
     queryKey: ["portfolio"],
     queryFn: () => api.portfolio.get(),
-    enabled: isAuthenticated,
     refetchInterval: 10000,
   });
 
   const { data: tradesData } = useQuery({
     queryKey: ["trades"],
     queryFn: () => api.portfolio.getTrades(50, 0),
-    enabled: isAuthenticated,
     refetchInterval: 15000,
   });
 
   const { data: analytics } = useQuery({
     queryKey: ["portfolioAnalytics"],
     queryFn: () => api.portfolio.getAnalytics(),
-    enabled: isAuthenticated && tab === "analytics",
+    enabled: tab === "analytics",
     staleTime: 30_000,
   });
 
   const { data: ordersData } = useQuery({
     queryKey: ["limitOrders"],
     queryFn: () => api.orders.getAll(),
-    enabled: isAuthenticated,
     refetchInterval: 10_000,
   });
 
@@ -79,22 +74,6 @@ export default function PortfolioPage() {
     () => tradesWithPnl.reduce((sum, t) => sum + (t.computedPnl ?? 0), 0),
     [tradesWithPnl]
   );
-
-  if (!isAuthenticated) {
-    return (
-      <div className="flex flex-col items-center justify-center h-96 gap-4">
-        <div className="h-14 w-14 rounded-2xl bg-bg-tertiary border border-border flex items-center justify-center">
-          <svg className="w-7 h-7 text-text-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M21 12a2.25 2.25 0 00-2.25-2.25H15a3 3 0 11-6 0H5.25A2.25 2.25 0 003 12m18 0v6a2.25 2.25 0 01-2.25 2.25H5.25A2.25 2.25 0 013 18v-6m18 0V9M3 12V9m18 0a2.25 2.25 0 00-2.25-2.25H5.25A2.25 2.25 0 013 9m18 0V6a2.25 2.25 0 00-2.25-2.25H5.25A2.25 2.25 0 013 6v3" />
-          </svg>
-        </div>
-        <div className="text-center">
-          <span className="text-sm font-bold block">Connect Wallet</span>
-          <span className="text-[11px] text-text-muted mt-1 block">Connect your wallet to view your portfolio</span>
-        </div>
-      </div>
-    );
-  }
 
   if (isLoading || !portfolio) {
     return (
