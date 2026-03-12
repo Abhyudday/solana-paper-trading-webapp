@@ -23,7 +23,7 @@ function getOrCreateSessionId(): string {
   if (typeof window === "undefined") return "";
   let id = localStorage.getItem(SESSION_KEY);
   if (!id) {
-    id = `session_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
+    id = `session_${Date.now()}_${Math.random().toString(36).slice(2, 11)}_${Math.random().toString(36).slice(2, 8)}`;
     localStorage.setItem(SESSION_KEY, id);
   }
   return id;
@@ -40,12 +40,28 @@ const AuthContext = createContext<AuthContextType>({
 });
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [state, setState] = useState<AuthState>({
-    token: null,
-    userId: null,
-    sessionId: null,
-    isAuthenticated: false,
-    isLoading: false,
+  const [state, setState] = useState<AuthState>(() => {
+    // Eagerly restore from localStorage so queries fire immediately on refresh
+    if (typeof window !== "undefined") {
+      const token = localStorage.getItem("auth_token");
+      const sessionId = localStorage.getItem(SESSION_KEY);
+      if (token && sessionId) {
+        return {
+          token,
+          userId: null,
+          sessionId,
+          isAuthenticated: true,
+          isLoading: false,
+        };
+      }
+    }
+    return {
+      token: null,
+      userId: null,
+      sessionId: null,
+      isAuthenticated: false,
+      isLoading: false,
+    };
   });
 
   const login = useCallback(async () => {

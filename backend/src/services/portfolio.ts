@@ -1,5 +1,6 @@
 import { prisma } from "../lib/prisma";
 import { safeGet, CACHE_KEYS } from "../lib/redis";
+import { config } from "../config";
 
 export interface PortfolioSummary {
   totalValue: number;
@@ -72,7 +73,7 @@ export async function getPortfolio(userId: string): Promise<PortfolioSummary> {
     return sum - proceeds - fee;
   }, 0);
 
-  const initialBalance = 10000;
+  const initialBalance = config.DEFAULT_PAPER_BALANCE;
   const roi = initialBalance > 0 ? ((totalValue - initialBalance) / initialBalance) * 100 : 0;
 
   return {

@@ -3,36 +3,41 @@
 import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { api, PortfolioAnalytics, LimitOrderResult } from "@/lib/api";
+import { useAuth } from "@/context/AuthContext";
 import { formatUSD, formatPnl, formatPercent, formatPrice, formatNumber, timeAgo, shortenAddress } from "@/lib/format";
 import Link from "next/link";
 
 type Tab = "holding" | "history" | "analytics" | "orders";
 
 export default function PortfolioPage() {
+  const { isAuthenticated } = useAuth();
   const [tab, setTab] = useState<Tab>("holding");
 
   const { data: portfolio, isLoading } = useQuery({
     queryKey: ["portfolio"],
     queryFn: () => api.portfolio.get(),
+    enabled: isAuthenticated,
     refetchInterval: 10000,
   });
 
   const { data: tradesData } = useQuery({
     queryKey: ["trades"],
     queryFn: () => api.portfolio.getTrades(50, 0),
+    enabled: isAuthenticated,
     refetchInterval: 15000,
   });
 
   const { data: analytics } = useQuery({
     queryKey: ["portfolioAnalytics"],
     queryFn: () => api.portfolio.getAnalytics(),
-    enabled: tab === "analytics",
+    enabled: isAuthenticated && tab === "analytics",
     staleTime: 30_000,
   });
 
   const { data: ordersData } = useQuery({
     queryKey: ["limitOrders"],
     queryFn: () => api.orders.getAll(),
+    enabled: isAuthenticated,
     refetchInterval: 10_000,
   });
 

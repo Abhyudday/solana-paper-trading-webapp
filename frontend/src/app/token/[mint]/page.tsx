@@ -5,6 +5,7 @@ import dynamic from "next/dynamic";
 import { useParams } from "next/navigation";
 import { useQuery, useQueryClient, keepPreviousData } from "@tanstack/react-query";
 import { api } from "@/lib/api";
+import { useAuth } from "@/context/AuthContext";
 import { wsClient } from "@/lib/ws";
 import { formatPrice, formatCompact, formatNumber, shortenAddress, formatPnl, formatPercent } from "@/lib/format";
 import { OrderPanel } from "@/components/OrderPanel";
@@ -29,6 +30,7 @@ type InfoTab = "info" | "holders" | "bundles";
 export default function TokenPage() {
   const params = useParams();
   const mint = params.mint as string;
+  const { isAuthenticated } = useAuth();
   const [range, setRange] = useState<ChartRange>("15s");
   const [infoTab, setInfoTab] = useState<InfoTab>("info");
   const queryClient = useQueryClient();
@@ -98,6 +100,7 @@ export default function TokenPage() {
   const { data: portfolio } = useQuery({
     queryKey: ["portfolio"],
     queryFn: () => api.portfolio.get(),
+    enabled: isAuthenticated,
     refetchInterval: 5_000,
     staleTime: 2_000,
   });
@@ -105,6 +108,7 @@ export default function TokenPage() {
   const { data: userTradesData } = useQuery({
     queryKey: ["userTrades"],
     queryFn: () => api.portfolio.getTrades(100, 0),
+    enabled: isAuthenticated,
     staleTime: 2_000,
   });
 

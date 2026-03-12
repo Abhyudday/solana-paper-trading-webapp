@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 export const authSchema = z.object({
-  walletAddress: z.string().min(32).max(44),
+  walletAddress: z.string().min(8).max(100),
 });
 
 export const tradeSchema = z.object({

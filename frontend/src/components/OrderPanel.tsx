@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, TokenInfo, LimitOrderResult } from "@/lib/api";
+import { useAuth } from "@/context/AuthContext";
 import { formatUSD, formatPrice } from "@/lib/format";
 
 interface OrderPanelProps {
@@ -22,6 +23,7 @@ const ORDER_MODES: { key: OrderMode; label: string }[] = [
 ];
 
 export function OrderPanel({ token, usdcBalance, tokenQty }: OrderPanelProps) {
+  const { isAuthenticated } = useAuth();
   const queryClient = useQueryClient();
   const [side, setSide] = useState<"buy" | "sell">("buy");
   const [orderMode, setOrderMode] = useState<OrderMode>("market");
@@ -34,6 +36,7 @@ export function OrderPanel({ token, usdcBalance, tokenQty }: OrderPanelProps) {
   const { data: ordersData } = useQuery({
     queryKey: ["limitOrders", "open"],
     queryFn: () => api.orders.getAll("open"),
+    enabled: isAuthenticated,
     refetchInterval: 10_000,
   });
 

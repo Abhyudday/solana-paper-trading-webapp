@@ -13,7 +13,7 @@ const envSchema = z.object({
   BACKEND_HOST: z.string().default("0.0.0.0"),
   SOLANA_TRACKER_API_KEY: z.string().default(""),
   SOLANA_TRACKER_BASE_URL: z.string().default("https://data.solanatracker.io"),
-  DEFAULT_PAPER_BALANCE: z.coerce.number().default(10000),
+  DEFAULT_PAPER_BALANCE: z.coerce.number().default(1000),
   SLIPPAGE_MIN: z.coerce.number().default(0.0005),
   SLIPPAGE_MAX: z.coerce.number().default(0.003),
   TRADE_FEE: z.coerce.number().default(0.001),
