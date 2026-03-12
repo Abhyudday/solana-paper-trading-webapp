@@ -63,20 +63,24 @@ model Trade {
 }
 
 model LimitOrder {
-  id          String   @id @default(cuid())
-  userId      String
-  mint        String
-  side        String   // "buy" | "sell"
-  orderType   String   // "limit" | "stop_loss" | "take_profit"
-  qty         Float
-  triggerPrice Float
-  status      String   @default("open") // "open" | "filled" | "cancelled"
-  note        String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  filledAt    DateTime?
-  filledPrice Float?
-  user        User     @relation(fields: [userId], references: [id])
+  id               String   @id @default(cuid())
+  userId           String
+  mint             String
+  side             String   // "buy" | "sell"
+  orderType        String   // "limit" | "stop_loss" | "take_profit"
+  qty              Float
+  triggerPrice     Float
+  triggerType      String   @default("price") // "price" | "pnl_percent" | "market_cap"
+  triggerPnlPercent Float?  // e.g. 20 for +20%, -10 for -10%
+  triggerMarketCap  Float?  // target market cap for market_cap mode
+  usdcAmount        Float?  // USDC amount for market_cap mode
+  status           String   @default("open") // "open" | "filled" | "cancelled"
+  note             String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  filledAt         DateTime?
+  filledPrice      Float?
+  user             User     @relation(fields: [userId], references: [id])
 
   @@index([userId])
   @@index([mint])

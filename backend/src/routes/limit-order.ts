@@ -10,8 +10,12 @@ const createOrderSchema = z.object({
   mint: z.string().min(32).max(44),
   side: z.enum(["buy", "sell"]),
   orderType: z.enum(["limit", "stop_loss", "take_profit"]),
-  qty: z.number().positive(),
-  triggerPrice: z.number().positive(),
+  qty: z.number().min(0),
+  triggerPrice: z.number().min(0),
+  triggerType: z.enum(["price", "pnl_percent", "market_cap"]).optional(),
+  triggerPnlPercent: z.number().optional(),
+  triggerMarketCap: z.number().positive().optional(),
+  usdcAmount: z.number().positive().optional(),
   note: z.string().max(500).optional(),
 });
 

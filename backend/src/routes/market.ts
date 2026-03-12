@@ -43,6 +43,21 @@ export async function marketRoutes(app: FastifyInstance) {
     return reply.send(info);
   });
 
+  app.post("/api/market/tokens/batch", async (request, reply) => {
+    const body = request.body as { mints?: string[] };
+    if (!body.mints || !Array.isArray(body.mints) || body.mints.length === 0) {
+      return reply.status(400).send({ error: "mints array required" });
+    }
+    const mints = body.mints.slice(0, 50); // cap at 50
+    const results = await adapter.getTokenInfoBatch(mints);
+    const tokens: Record<string, typeof results[0]> = {};
+    for (let i = 0; i < mints.length; i++) {
+      if (results[i]) tokens[mints[i]] = results[i];
+    }
+    reply.header("Cache-Control", "public, max-age=5, stale-while-revalidate=10");
+    return reply.send({ tokens });
+  });
+
   app.get("/api/market/tokens/:mint/chart", async (request, reply) => {
     const { mint } = request.params as { mint: string };
     const parsed = chartSchema.safeParse(request.query);

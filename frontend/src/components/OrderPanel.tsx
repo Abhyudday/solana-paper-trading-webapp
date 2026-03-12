@@ -4,15 +4,17 @@ import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, TokenInfo, LimitOrderResult } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
-import { formatUSD, formatPrice } from "@/lib/format";
+import { formatUSD, formatPrice, formatCompact } from "@/lib/format";
 
 interface OrderPanelProps {
   token: TokenInfo;
   usdcBalance: number;
   tokenQty: number;
+  avgEntryPrice?: number;
 }
 
 type OrderMode = "market" | "limit" | "stop_loss" | "take_profit";
+type TriggerMode = "price" | "pnl_percent" | "market_cap";
 const PRESET_AMOUNTS = [10, 25, 50, 100];
 
 const ORDER_MODES: { key: OrderMode; label: string }[] = [
@@ -22,13 +24,17 @@ const ORDER_MODES: { key: OrderMode; label: string }[] = [
   { key: "take_profit", label: "TP" },
 ];
 
-export function OrderPanel({ token, usdcBalance, tokenQty }: OrderPanelProps) {
+export function OrderPanel({ token, usdcBalance, tokenQty, avgEntryPrice }: OrderPanelProps) {
   const { isAuthenticated } = useAuth();
   const queryClient = useQueryClient();
   const [side, setSide] = useState<"buy" | "sell">("buy");
   const [orderMode, setOrderMode] = useState<OrderMode>("market");
+  const [triggerMode, setTriggerMode] = useState<TriggerMode>("price");
   const [amount, setAmount] = useState("");
   const [triggerPrice, setTriggerPrice] = useState("");
+  const [pnlPercent, setPnlPercent] = useState("");
+  const [targetMarketCap, setTargetMarketCap] = useState("");
+  const [mcapUsdcAmount, setMcapUsdcAmount] = useState("");
   const [note, setNote] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -70,21 +76,31 @@ export function OrderPanel({ token, usdcBalance, tokenQty }: OrderPanelProps) {
   });
 
   const limitMutation = useMutation({
-    mutationFn: () =>
-      api.orders.create({
+    mutationFn: () => {
+      const params: import("@/lib/api").CreateLimitOrderParams = {
         mint: token.mint,
         side,
         orderType: orderMode as "limit" | "stop_loss" | "take_profit",
-        qty: parseFloat(amount),
-        triggerPrice: parseFloat(triggerPrice),
+        qty: triggerMode === "market_cap" ? 0 : parseFloat(amount),
+        triggerPrice: triggerMode === "pnl_percent" ? 0 : parseFloat(triggerPrice || "0"),
+        triggerType: triggerMode,
         note: note || undefined,
-      }),
-    onSuccess: (result) => {
+      };
+      if (triggerMode === "pnl_percent") {
+        params.triggerPnlPercent = parseFloat(pnlPercent);
+        params.qty = parseFloat(amount);
+      }
+      if (triggerMode === "market_cap") {
+        params.triggerMarketCap = parseFloat(targetMarketCap);
+        params.usdcAmount = parseFloat(mcapUsdcAmount);
+      }
+      return api.orders.create(params);
+    },
+    onSuccess: () => {
       const typeLabel = orderMode === "limit" ? "Limit" : orderMode === "stop_loss" ? "Stop Loss" : "Take Profit";
-      setSuccess(`${typeLabel} ${side} order placed @ ${formatPrice(result.triggerPrice)}`);
-      setAmount("");
-      setTriggerPrice("");
-      setNote("");
+      const modeLabel = triggerMode === "pnl_percent" ? ` (PnL ${pnlPercent}%)` : triggerMode === "market_cap" ? ` (MCap ${formatCompact(parseFloat(targetMarketCap || "0"))})` : "";
+      setSuccess(`${typeLabel} ${side} order placed${modeLabel}`);
+      setAmount(""); setTriggerPrice(""); setPnlPercent(""); setTargetMarketCap(""); setMcapUsdcAmount(""); setNote("");
       setError(null);
       queryClient.invalidateQueries({ queryKey: ["limitOrders"] });
       setTimeout(() => setSuccess(null), 5000);
@@ -110,13 +126,29 @@ export function OrderPanel({ token, usdcBalance, tokenQty }: OrderPanelProps) {
       const val = parseFloat(amount);
       if (!val || val <= 0) { setError("Enter a valid amount"); return; }
       if (side === "buy" && val > usdcBalance) { setError("Insufficient USDC balance"); return; }
-      if (side === "sell" && val > tokenQty) { setError("Insufficient token balance"); return; }
+      if (side === "sell" && val > tokenQty + 0.000001) { setError(`Insufficient token balance (have ${tokenQty.toFixed(6)})`); return; }
       tradeMutation.mutate();
     } else {
-      const qty = parseFloat(amount);
-      const price = parseFloat(triggerPrice);
-      if (!qty || qty <= 0) { setError("Enter a valid quantity"); return; }
-      if (!price || price <= 0) { setError("Enter a valid trigger price"); return; }
+      if (triggerMode === "pnl_percent") {
+        const pct = parseFloat(pnlPercent);
+        if (isNaN(pct)) { setError("Enter a valid PnL %"); return; }
+        const qty = parseFloat(amount);
+        if (!qty || qty <= 0) { setError("Enter a valid quantity"); return; }
+      } else if (triggerMode === "market_cap") {
+        const mcap = parseFloat(targetMarketCap);
+        const usdc = parseFloat(mcapUsdcAmount);
+        if (!mcap || mcap <= 0) { setError("Enter a valid target market cap"); return; }
+        if (side === "buy" && (!usdc || usdc <= 0)) { setError("Enter USDC amount to spend"); return; }
+        if (side === "sell") {
+          const qty = parseFloat(amount);
+          if (!qty || qty <= 0) { setError("Enter a valid quantity"); return; }
+        }
+      } else {
+        const qty = parseFloat(amount);
+        const price = parseFloat(triggerPrice);
+        if (!qty || qty <= 0) { setError("Enter a valid quantity"); return; }
+        if (!price || price <= 0) { setError("Enter a valid trigger price"); return; }
+      }
       limitMutation.mutate();
     }
   }
@@ -157,7 +189,7 @@ export function OrderPanel({ token, usdcBalance, tokenQty }: OrderPanelProps) {
         {ORDER_MODES.map((mode) => (
           <button
             key={mode.key}
-            onClick={() => setOrderMode(mode.key)}
+            onClick={() => { setOrderMode(mode.key); if (mode.key === "market") setTriggerMode("price"); }}
             className={`flex-1 py-1.5 rounded-md text-[9px] font-bold transition-all ${
               orderMode === mode.key
                 ? "bg-bg-card text-text-primary shadow-sm border border-border"
@@ -169,6 +201,25 @@ export function OrderPanel({ token, usdcBalance, tokenQty }: OrderPanelProps) {
         ))}
       </div>
 
+      {/* Trigger mode selector for SL/TP/Limit */}
+      {isLimitMode && (
+        <div className="flex gap-0.5 mb-3 p-0.5 bg-bg-tertiary/30 rounded-lg border border-border/30">
+          {(["price", ...(orderMode !== "limit" ? ["pnl_percent"] : []), "market_cap"] as TriggerMode[]).map((mode) => (
+            <button
+              key={mode}
+              onClick={() => setTriggerMode(mode)}
+              className={`flex-1 py-1 rounded-md text-[8px] font-bold transition-all ${
+                triggerMode === mode
+                  ? "bg-accent-blue/10 text-accent-blue border border-accent-blue/20"
+                  : "text-text-muted hover:text-text-secondary"
+              }`}
+            >
+              {mode === "price" ? "Price" : mode === "pnl_percent" ? "PnL %" : "MCap"}
+            </button>
+          ))}
+        </div>
+      )}
+
       {/* Balance display */}
       <div className="flex items-center gap-2 mb-2.5">
         <span className="text-[9px] text-text-muted ml-auto font-mono">
@@ -177,8 +228,8 @@ export function OrderPanel({ token, usdcBalance, tokenQty }: OrderPanelProps) {
       </div>
 
       <form onSubmit={handleSubmit}>
-        {/* Trigger Price */}
-        {isLimitMode && (
+        {/* Trigger Price (standard price mode) */}
+        {isLimitMode && triggerMode === "price" && (
           <div className="mb-2.5">
             <label className="text-[8px] text-text-muted uppercase tracking-widest font-bold mb-1 block">
               {orderMode === "limit" ? "Limit Price" : orderMode === "stop_loss" ? "Stop Price" : "Take Profit Price"}
@@ -203,6 +254,87 @@ export function OrderPanel({ token, usdcBalance, tokenQty }: OrderPanelProps) {
             >
               Use current price
             </button>
+          </div>
+        )}
+
+        {/* PnL % trigger mode */}
+        {isLimitMode && triggerMode === "pnl_percent" && (
+          <div className="mb-2.5">
+            <label className="text-[8px] text-text-muted uppercase tracking-widest font-bold mb-1 block">
+              {orderMode === "stop_loss" ? "Stop Loss at PnL %" : "Take Profit at PnL %"}
+            </label>
+            <div className="flex items-center border border-border rounded-lg bg-bg-input overflow-hidden">
+              <input
+                type="number"
+                step="any"
+                value={pnlPercent}
+                onChange={(e) => setPnlPercent(e.target.value)}
+                placeholder={orderMode === "stop_loss" ? "-10" : "20"}
+                className="flex-1 bg-transparent px-3 py-2 text-[11px] font-mono outline-none text-text-primary"
+                aria-label="PnL percentage"
+              />
+              <span className="text-[9px] text-text-muted px-3 font-semibold">%</span>
+            </div>
+            {avgEntryPrice && avgEntryPrice > 0 && (
+              <div className="text-[8px] text-text-muted mt-1">
+                Entry: {formatPrice(avgEntryPrice)} — triggers at {parseFloat(pnlPercent || "0") !== 0 ? formatPrice(avgEntryPrice * (1 + parseFloat(pnlPercent) / 100)) : "..."}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Market Cap trigger mode */}
+        {isLimitMode && triggerMode === "market_cap" && (
+          <div className="mb-2.5 space-y-2">
+            <div>
+              <label className="text-[8px] text-text-muted uppercase tracking-widest font-bold mb-1 block">Target Market Cap</label>
+              <div className="flex items-center border border-border rounded-lg bg-bg-input overflow-hidden">
+                <input
+                  type="number"
+                  step="any"
+                  min="0"
+                  value={targetMarketCap}
+                  onChange={(e) => setTargetMarketCap(e.target.value)}
+                  placeholder={formatCompact(token.marketCap)}
+                  className="flex-1 bg-transparent px-3 py-2 text-[11px] font-mono outline-none text-text-primary"
+                  aria-label="Target market cap"
+                />
+                <span className="text-[9px] text-text-muted px-3 font-semibold">USD</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setTargetMarketCap(String(token.marketCap))}
+                className="text-[9px] text-accent-blue hover:text-accent-green mt-1 transition-colors font-semibold"
+              >
+                Use current MCap ({formatCompact(token.marketCap)})
+              </button>
+            </div>
+            {side === "buy" && (
+              <div>
+                <label className="text-[8px] text-text-muted uppercase tracking-widest font-bold mb-1 block">USDC Amount</label>
+                <div className="flex items-center border border-border rounded-lg bg-bg-input overflow-hidden">
+                  <input
+                    type="number"
+                    step="any"
+                    min="0"
+                    value={mcapUsdcAmount}
+                    onChange={(e) => setMcapUsdcAmount(e.target.value)}
+                    placeholder="0.00"
+                    className="flex-1 bg-transparent px-3 py-2 text-[11px] font-mono outline-none text-text-primary"
+                    aria-label="USDC amount"
+                  />
+                  <span className="text-[9px] text-text-muted px-3 font-semibold">USDC</span>
+                </div>
+              </div>
+            )}
+            {parseFloat(targetMarketCap || "0") > 0 && token.supply > 0 && (
+              <div className="text-[8px] text-text-muted">
+                Est. price at target: {formatPrice(parseFloat(targetMarketCap) / token.supply)}
+                {side === "buy" && parseFloat(mcapUsdcAmount || "0") > 0 && (
+                  <> — Est. tokens: {(parseFloat(mcapUsdcAmount) / (parseFloat(targetMarketCap) / token.supply)).toFixed(4)}</>
+                )}
+              </div>
+            )}
           </div>
         )}
 
@@ -251,8 +383,8 @@ export function OrderPanel({ token, usdcBalance, tokenQty }: OrderPanelProps) {
                 key={pct}
                 type="button"
                 onClick={() => {
-                  if (isLimitMode) {
-                    setAmount(((tokenQty * pct) / 100).toFixed(6));
+                  if (pct === 100) {
+                    setAmount(tokenQty.toString());
                   } else {
                     setAmount(((tokenQty * pct) / 100).toFixed(6));
                   }
@@ -296,15 +428,15 @@ export function OrderPanel({ token, usdcBalance, tokenQty }: OrderPanelProps) {
                 <span className="font-mono text-text-secondary">{formatUSD(fee)}</span>
               </div>
               {side === "buy" && parseFloat(amount || "0") > 0 && (
-                <div className="flex justify-between">
-                  <span>Est. Receive</span>
-                  <span className="font-mono text-accent-green font-semibold">{estimatedQty.toFixed(6)} {token.symbol}</span>
+                <div className="flex justify-between items-center py-1 px-2 -mx-1 rounded-lg bg-accent-green/5 border border-accent-green/10">
+                  <span className="text-[11px] font-semibold text-text-secondary">Est. Receive</span>
+                  <span className="font-mono text-accent-green font-bold text-[13px]">{estimatedQty.toFixed(6)} {token.symbol}</span>
                 </div>
               )}
               {side === "sell" && parseFloat(amount || "0") > 0 && (
-                <div className="flex justify-between">
-                  <span>Est. Receive</span>
-                  <span className="font-mono text-accent-green font-semibold">{formatUSD(estimatedCost)}</span>
+                <div className="flex justify-between items-center py-1 px-2 -mx-1 rounded-lg bg-accent-green/5 border border-accent-green/10">
+                  <span className="text-[11px] font-semibold text-text-secondary">Est. Receive</span>
+                  <span className="font-mono text-accent-green font-bold text-[13px]">{formatUSD(estimatedCost)}</span>
                 </div>
               )}
             </>
@@ -352,9 +484,14 @@ export function OrderPanel({ token, usdcBalance, tokenQty }: OrderPanelProps) {
                 <span className="text-text-muted">
                   {order.orderType === "limit" ? "Limit" : order.orderType === "stop_loss" ? "SL" : "TP"}
                 </span>
-                <span className="font-mono text-text-secondary">{order.qty.toFixed(4)}</span>
-                <span className="text-text-muted">@</span>
-                <span className="font-mono text-text-secondary">{formatPrice(order.triggerPrice)}</span>
+                <span className="font-mono text-text-secondary">{order.qty > 0 ? order.qty.toFixed(4) : ""}</span>
+                {order.triggerType === "pnl_percent" && order.triggerPnlPercent !== null ? (
+                  <span className="font-mono text-accent-blue">{order.triggerPnlPercent > 0 ? "+" : ""}{order.triggerPnlPercent}%</span>
+                ) : order.triggerType === "market_cap" && order.triggerMarketCap ? (
+                  <span className="font-mono text-accent-yellow">MCap {formatCompact(order.triggerMarketCap)}</span>
+                ) : (
+                  <><span className="text-text-muted">@</span><span className="font-mono text-text-secondary">{formatPrice(order.triggerPrice)}</span></>
+                )}
                 <button
                   onClick={() => cancelMutation.mutate(order.id)}
                   disabled={cancelMutation.isPending}

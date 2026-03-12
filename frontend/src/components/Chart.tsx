@@ -157,7 +157,13 @@ function rangeToBucketSec(range?: string): number {
 function aggregateCandles(data: OHLCVBar[], range?: string): OHLCVBar[] {
   const bucketSec = rangeToBucketSec(range);
   const sorted = data
-    .filter((bar) => bar.time > 0 && bar.open > 0)
+    .filter((bar) => bar.time > 0 && (bar.open > 0 || bar.close > 0))
+    .map((bar) => ({
+      ...bar,
+      open: bar.open > 0 ? bar.open : bar.close,
+      high: bar.high > 0 ? bar.high : Math.max(bar.open, bar.close),
+      low: bar.low > 0 ? bar.low : Math.min(bar.open || bar.close, bar.close),
+    }))
     .sort((a, b) => a.time - b.time);
   if (sorted.length === 0) return [];
 
@@ -371,13 +377,23 @@ export const Chart = memo(function Chart({ data, height = 400, supply, marketCap
   }, [structureKey]);
 
   // ── DATA UPDATE (runs on every data change — NO chart recreation) ──
+  const dataUpdateTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
+    // Debounce rapid data updates (e.g. websocket floods) — max 1 update per 100ms
+    if (dataUpdateTimerRef.current) clearTimeout(dataUpdateTimerRef.current);
+    dataUpdateTimerRef.current = setTimeout(() => { dataUpdateTimerRef.current = null; }, 100);
+
     const priceChart = priceChartRef.current;
     const candleSeries = candleSeriesRef.current;
     const volumeSeries = volumeSeriesRef.current;
     if (!priceChart || !candleSeries || !volumeSeries) return;
 
-    const filtered = aggregateCandles(data, range);
+    let filtered: OHLCVBar[];
+    try {
+      filtered = aggregateCandles(data, range);
+    } catch {
+      return;
+    }
     if (filtered.length === 0) return;
 
     // Compute MCap multiplier: prefer supply, fall back to marketCap/currentPrice
@@ -616,6 +632,34 @@ export const Chart = memo(function Chart({ data, height = 400, supply, marketCap
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [avgEntryPrice, avgExitPrice, chartMode, supply, marketCap, currentPrice, structureKey]);
 
+  const handleZoomIn = useCallback(() => {
+    const ts = priceChartRef.current?.timeScale();
+    if (!ts) return;
+    const lr = ts.getVisibleLogicalRange();
+    if (!lr) return;
+    const span = lr.to - lr.from;
+    const mid = (lr.from + lr.to) / 2;
+    const newSpan = Math.max(span * 0.6, 5);
+    ts.setVisibleLogicalRange({ from: mid - newSpan / 2, to: mid + newSpan / 2 });
+  }, []);
+
+  const handleZoomOut = useCallback(() => {
+    const ts = priceChartRef.current?.timeScale();
+    if (!ts) return;
+    const lr = ts.getVisibleLogicalRange();
+    if (!lr) return;
+    const span = lr.to - lr.from;
+    const mid = (lr.from + lr.to) / 2;
+    const newSpan = span * 1.6;
+    ts.setVisibleLogicalRange({ from: mid - newSpan / 2, to: mid + newSpan / 2 });
+  }, []);
+
+  const handleZoomReset = useCallback(() => {
+    const allCharts = [priceChartRef.current, volumeChartRef.current, rsiChartRef.current, macdChartRef.current].filter(Boolean) as IChartApi[];
+    allCharts.forEach((c) => c.timeScale().fitContent());
+    savedLogicalRangeRef.current = null;
+  }, []);
+
   const filtered = useMemo(() => aggregateCandles(data, range), [data, range]);
   if (filtered.length === 0 && !chartError) {
     return (
@@ -690,6 +734,32 @@ export const Chart = memo(function Chart({ data, height = 400, supply, marketCap
             <span className="bg-accent-blue/10 text-accent-blue px-1.5 rounded-md text-[7px] font-bold">{activeIndicators.size}</span>
           )}
         </button>
+        {/* Zoom controls */}
+        <div className="flex items-center gap-0.5 ml-auto">
+          <button
+            onClick={handleZoomIn}
+            className="px-1.5 py-0.5 rounded text-[10px] font-bold text-[#44445a] hover:text-text-secondary hover:bg-[#15151e] transition-all"
+            title="Zoom In"
+          >
+            +
+          </button>
+          <button
+            onClick={handleZoomOut}
+            className="px-1.5 py-0.5 rounded text-[10px] font-bold text-[#44445a] hover:text-text-secondary hover:bg-[#15151e] transition-all"
+            title="Zoom Out"
+          >
+            −
+          </button>
+          <button
+            onClick={handleZoomReset}
+            className="px-1.5 py-0.5 rounded text-[9px] font-bold text-[#44445a] hover:text-text-secondary hover:bg-[#15151e] transition-all"
+            title="Reset Zoom"
+          >
+            <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M9 9V4.5M9 9H4.5M9 9L3.75 3.75M9 15v4.5M9 15H4.5M9 15l-5.25 5.25M15 9h4.5M15 9V4.5M15 9l5.25-5.25M15 15h4.5M15 15v4.5m0-4.5l5.25 5.25" />
+            </svg>
+          </button>
+        </div>
         {Array.from(activeIndicators).map((key) => {
           const ind = INDICATORS.find((i) => i.key === key)!;
           return (

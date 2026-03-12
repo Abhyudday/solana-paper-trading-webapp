@@ -4,6 +4,7 @@ import { useState, useMemo, useCallback, useRef, useEffect, Fragment } from "rea
 import { useQuery, useQueryClient, keepPreviousData } from "@tanstack/react-query";
 import { api, TokenInfo, TokenFilterParams, FilteredTokenItem } from "@/lib/api";
 import { formatCompact, formatPrice, shortenAddress } from "@/lib/format";
+import { usePageVisibility } from "@/hooks/usePageVisibility";
 import { FilterPanel } from "@/components/FilterPanel";
 import Link from "next/link";
 
@@ -347,6 +348,8 @@ export default function LandingPage() {
     migrated: {},
   });
   const [filterOpen, setFilterOpen] = useState<ColumnId | null>(null);
+  const isTabVisible = usePageVisibility();
+  const visScale = isTabVisible ? 1 : 4;
 
   const lastLatestRef = useRef<TokenInfo[]>([]);
   const lastGraduatingRef = useRef<TokenInfo[]>([]);
@@ -355,7 +358,7 @@ export default function LandingPage() {
   const { data: latestData, isLoading: latestLoading } = useQuery({
     queryKey: ["latestTokens"],
     queryFn: () => api.market.getLatestTokens(),
-    refetchInterval: 8_000,
+    refetchInterval: 8_000 * visScale,
     staleTime: 4_000,
     refetchOnWindowFocus: false,
     placeholderData: keepPreviousData,
@@ -364,7 +367,7 @@ export default function LandingPage() {
   const { data: graduatingData, isLoading: graduatingLoading } = useQuery({
     queryKey: ["graduatingTokens"],
     queryFn: () => api.market.getGraduatingTokens(),
-    refetchInterval: 8_000,
+    refetchInterval: 8_000 * visScale,
     staleTime: 4_000,
     refetchOnWindowFocus: false,
     placeholderData: keepPreviousData,
@@ -373,7 +376,7 @@ export default function LandingPage() {
   const { data: graduatedData, isLoading: graduatedLoading } = useQuery({
     queryKey: ["graduatedTokens"],
     queryFn: () => api.market.getGraduatedTokens(),
-    refetchInterval: 8_000,
+    refetchInterval: 8_000 * visScale,
     staleTime: 4_000,
     refetchOnWindowFocus: false,
     placeholderData: keepPreviousData,
@@ -397,7 +400,7 @@ export default function LandingPage() {
     queryKey: ["filteredNew", columnFilters.new],
     queryFn: () => api.market.getFilteredTokens({ ...columnFilters.new, sortBy: "createdAt", sortOrder: "desc" }),
     enabled: newHasFilters,
-    refetchInterval: 10_000,
+    refetchInterval: 10_000 * visScale,
     staleTime: 5_000,
     refetchOnWindowFocus: false,
     placeholderData: keepPreviousData,
@@ -407,7 +410,7 @@ export default function LandingPage() {
     queryKey: ["filteredMigrating", columnFilters.migrating],
     queryFn: () => api.market.getFilteredTokens({ ...columnFilters.migrating, status: "graduating" }),
     enabled: migratingHasFilters,
-    refetchInterval: 10_000,
+    refetchInterval: 10_000 * visScale,
     staleTime: 5_000,
     refetchOnWindowFocus: false,
     placeholderData: keepPreviousData,
@@ -417,7 +420,7 @@ export default function LandingPage() {
     queryKey: ["filteredMigrated", columnFilters.migrated],
     queryFn: () => api.market.getFilteredTokens({ ...columnFilters.migrated, status: "graduated" }),
     enabled: migratedHasFilters,
-    refetchInterval: 10_000,
+    refetchInterval: 10_000 * visScale,
     staleTime: 5_000,
     refetchOnWindowFocus: false,
     placeholderData: keepPreviousData,

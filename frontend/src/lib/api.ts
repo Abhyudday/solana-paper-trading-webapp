@@ -154,6 +154,11 @@ export const api = {
     getTokenSnipers: (mint: string) => request<SniperInfo>(`/api/market/tokens/${mint}/snipers`),
     getGraduatingTokens: () => request<{ tokens: TokenInfo[] }>("/api/market/graduating"),
     getGraduatedTokens: () => request<{ tokens: TokenInfo[] }>("/api/market/graduated"),
+    getTokenInfoBatch: (mints: string[]) =>
+      request<{ tokens: Record<string, TokenInfo> }>("/api/market/tokens/batch", {
+        method: "POST",
+        body: JSON.stringify({ mints }),
+      }),
     getFilteredTokens: (filters: TokenFilterParams) => {
       const params = new URLSearchParams();
       Object.entries(filters).forEach(([k, v]) => {
@@ -420,6 +425,10 @@ export interface CreateLimitOrderParams {
   orderType: "limit" | "stop_loss" | "take_profit";
   qty: number;
   triggerPrice: number;
+  triggerType?: "price" | "pnl_percent" | "market_cap";
+  triggerPnlPercent?: number;
+  triggerMarketCap?: number;
+  usdcAmount?: number;
   note?: string;
 }
 
@@ -430,6 +439,10 @@ export interface LimitOrderResult {
   orderType: string;
   qty: number;
   triggerPrice: number;
+  triggerType: string;
+  triggerPnlPercent: number | null;
+  triggerMarketCap: number | null;
+  usdcAmount: number | null;
   status: string;
   note: string | null;
   createdAt: string;

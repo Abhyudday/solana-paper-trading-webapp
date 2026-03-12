@@ -57,8 +57,19 @@ function calculateRiskScore(bundled: boolean, bundlePercentage: number, bundleCo
 
 const CACHE_TTL_PRICE = 15; // seconds
 const CACHE_TTL_INFO = 45;
-const CACHE_TTL_TOP = 60;
-const CACHE_TTL_CHART = 15;
+const CACHE_TTL_TOP = 90;
+const CACHE_TTL_CHART = 30;
+
+// Inflight request deduplication: share a single promise for identical concurrent calls
+const inflightRequests = new Map<string, Promise<unknown>>();
+
+function deduplicatedFetch<T>(key: string, fn: () => Promise<T>): Promise<T> {
+  const existing = inflightRequests.get(key);
+  if (existing) return existing as Promise<T>;
+  const promise = fn().finally(() => inflightRequests.delete(key));
+  inflightRequests.set(key, promise);
+  return promise;
+}
 
 async function fetchApi<T>(path: string, params?: Record<string, string>): Promise<T> {
   const url = new URL(path, config.SOLANA_TRACKER_BASE_URL);
@@ -223,7 +234,7 @@ export class SolanaTrackerAdapter implements MarketDataAdapter {
 
     try {
       const [data, dexPaid] = await Promise.all([
-        fetchApi<{
+        deduplicatedFetch(`tokenInfo:${mint}`, () => fetchApi<{
           token?: {
             mint?: string; symbol?: string; name?: string; decimals?: number; image?: string;
             twitter?: string; telegram?: string; website?: string; discord?: string;
@@ -235,7 +246,7 @@ export class SolanaTrackerAdapter implements MarketDataAdapter {
             volume?: { h24?: number };
           }>;
           supply?: number;
-        }>(`/tokens/${mint}`),
+        }>(`/tokens/${mint}`)),
         checkDexPaid(mint),
       ]);
 
@@ -271,12 +282,17 @@ export class SolanaTrackerAdapter implements MarketDataAdapter {
     }
   }
 
+  async getTokenInfoBatch(mints: string[]): Promise<(TokenInfo | null)[]> {
+    return Promise.all(mints.map((mint) => this.getTokenInfo(mint)));
+  }
+
   async getOHLCV(mint: string, range: ChartRange): Promise<OHLCVBar[]> {
     const cacheKey = `chart:${mint}:${range}`;
     const isUltraShort = ["1s", "5s", "15s"].includes(range);
     const isShortRange = ["30s", "1m"].includes(range);
-    const memTtl = isUltraShort ? 2 : isShortRange ? 5 : 15;
-    const redisTtl = isUltraShort ? 5 : isShortRange ? 10 : CACHE_TTL_CHART;
+    const isLongRange = ["1h", "6h", "1d", "7d", "30d"].includes(range);
+    const memTtl = isUltraShort ? 2 : isShortRange ? 5 : isLongRange ? 30 : 15;
+    const redisTtl = isUltraShort ? 5 : isShortRange ? 10 : isLongRange ? 120 : CACHE_TTL_CHART;
 
     // Skip memCache for ultra-short to always get freshest from Redis/API
     if (!isUltraShort) {
@@ -296,7 +312,7 @@ export class SolanaTrackerAdapter implements MarketDataAdapter {
     const interval = rangeToInterval(range);
 
     try {
-      const data = await fetchApi<{
+      const data = await deduplicatedFetch(`chart:${mint}:${range}`, () => fetchApi<{
         oclhv?: Array<{
           time?: number;
           unixTime?: number;
@@ -310,7 +326,7 @@ export class SolanaTrackerAdapter implements MarketDataAdapter {
         type: interval,
         time_from: String(from),
         time_to: String(now),
-      });
+      }));
 
       const bars = (data.oclhv || []).map((b) => ({
         time: b.time || b.unixTime || 0,

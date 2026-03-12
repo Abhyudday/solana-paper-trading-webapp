@@ -8,6 +8,7 @@ import { api } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { wsClient } from "@/lib/ws";
 import { formatPrice, formatCompact, formatNumber, shortenAddress, formatPnl, formatPercent } from "@/lib/format";
+import { usePageVisibility } from "@/hooks/usePageVisibility";
 import { OrderPanel } from "@/components/OrderPanel";
 import { Transactions } from "@/components/OrderBook";
 import { TopHolders } from "@/components/TopHolders";
@@ -34,12 +35,14 @@ export default function TokenPage() {
   const [range, setRange] = useState<ChartRange>("15s");
   const [infoTab, setInfoTab] = useState<InfoTab>("info");
   const queryClient = useQueryClient();
+  const isTabVisible = usePageVisibility();
+  const visScale = isTabVisible ? 1 : 4; // 4x slower polling when tab hidden
 
   const { data: tokenInfo, isLoading: tokenLoading, isFetched: tokenFetched } = useQuery({
     queryKey: ["token", mint],
     queryFn: () => api.market.getToken(mint),
     enabled: !!mint,
-    refetchInterval: 3_000,
+    refetchInterval: 3_000 * visScale,
     staleTime: 1_500,
     placeholderData: keepPreviousData,
   });
@@ -62,7 +65,7 @@ export default function TokenPage() {
     queryKey: ["chart", mint, range],
     queryFn: () => api.market.getChart(mint, range),
     enabled: !!mint,
-    refetchInterval: chartRefetchInterval,
+    refetchInterval: chartRefetchInterval * visScale,
     staleTime: isShortRange ? 2_000 : 10_000,
     placeholderData: keepPreviousData,
     retry: 2,
@@ -101,7 +104,7 @@ export default function TokenPage() {
     queryKey: ["portfolio"],
     queryFn: () => api.portfolio.get(),
     enabled: isAuthenticated,
-    refetchInterval: 5_000,
+    refetchInterval: 5_000 * visScale,
     staleTime: 2_000,
   });
 
@@ -214,7 +217,28 @@ export default function TokenPage() {
 
   const avgEntryFromTrades = useMemo(() => {
     if (!userTradesData?.trades) return undefined;
-    const buyTrades = userTradesData.trades.filter((tr) => tr.mint === mint && tr.side === "buy");
+    // Get all trades for this mint sorted by timestamp ascending
+    const mintTrades = userTradesData.trades
+      .filter((tr) => tr.mint === mint)
+      .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+    if (mintTrades.length === 0) return undefined;
+
+    // Walk through trades to find the last full exit (running qty drops to ~0)
+    let lastFullExitIdx = -1;
+    let runningQty = 0;
+    for (let i = 0; i < mintTrades.length; i++) {
+      const tr = mintTrades[i];
+      if (tr.side === "buy") runningQty += tr.qty;
+      else runningQty -= tr.qty;
+      if (runningQty < 0.000001) {
+        lastFullExitIdx = i;
+        runningQty = 0;
+      }
+    }
+
+    // Only include buy trades AFTER the last full exit
+    const relevantTrades = mintTrades.slice(lastFullExitIdx + 1);
+    const buyTrades = relevantTrades.filter((tr) => tr.side === "buy");
     if (buyTrades.length === 0) return undefined;
     const totalQty = buyTrades.reduce((sum, tr) => sum + tr.qty, 0);
     const totalValue = buyTrades.reduce((sum, tr) => sum + tr.qty * tr.price, 0);
@@ -223,12 +247,39 @@ export default function TokenPage() {
 
   const avgExitPrice = useMemo(() => {
     if (!userTradesData?.trades) return undefined;
-    const sellTrades = userTradesData.trades.filter((tr) => tr.mint === mint && tr.side === "sell");
+    const mintTrades = userTradesData.trades
+      .filter((tr) => tr.mint === mint)
+      .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+    if (mintTrades.length === 0) return undefined;
+
+    // Find the last full exit, then get sells from that cycle
+    let lastFullExitIdx = -1;
+    let prevFullExitIdx = -1;
+    let runningQty = 0;
+    for (let i = 0; i < mintTrades.length; i++) {
+      const tr = mintTrades[i];
+      if (tr.side === "buy") runningQty += tr.qty;
+      else runningQty -= tr.qty;
+      if (runningQty < 0.000001) {
+        prevFullExitIdx = lastFullExitIdx;
+        lastFullExitIdx = i;
+        runningQty = 0;
+      }
+    }
+
+    // If position is currently open, no exit price to show
+    if (position && position.qty > 0) return undefined;
+
+    // Show exit price from the last closed cycle
+    const cycleStart = prevFullExitIdx + 1;
+    const cycleEnd = lastFullExitIdx + 1;
+    const cycleTrades = mintTrades.slice(cycleStart, cycleEnd);
+    const sellTrades = cycleTrades.filter((tr) => tr.side === "sell");
     if (sellTrades.length === 0) return undefined;
     const totalQty = sellTrades.reduce((sum, tr) => sum + tr.qty, 0);
     const totalValue = sellTrades.reduce((sum, tr) => sum + tr.qty * tr.price, 0);
     return totalQty > 0 ? totalValue / totalQty : undefined;
-  }, [userTradesData, mint]);
+  }, [userTradesData, mint, position]);
 
   const effectiveAvgEntry = position?.avgEntryPrice ?? avgEntryFromTrades;
 
@@ -433,7 +484,7 @@ export default function TokenPage() {
 
         {/* Right: Order Panel + Tabbed Info */}
         <div className="flex flex-col gap-3">
-          <OrderPanel token={t} usdcBalance={usdcBalance} tokenQty={tokenQty} />
+          <OrderPanel token={t} usdcBalance={usdcBalance} tokenQty={tokenQty} avgEntryPrice={effectiveAvgEntry} />
 
           {/* Tabbed info section */}
           <div className="rounded-xl border border-border bg-bg-card overflow-hidden">
