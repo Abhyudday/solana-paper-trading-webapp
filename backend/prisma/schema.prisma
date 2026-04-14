@@ -1,0 +1,99 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String         @id @default(cuid())
+  walletAddress String         @unique
+  email         String?
+  createdAt     DateTime       @default(now())
+  balances      PaperBalance[]
+  positions     Position[]
+  trades        Trade[]
+  limitOrders   LimitOrder[]
+
+  @@index([walletAddress])
+}
+
+model PaperBalance {
+  id       String @id @default(cuid())
+  userId   String
+  currency String
+  amount   Float  @default(0)
+  user     User   @relation(fields: [userId], references: [id])
+
+  @@unique([userId, currency])
+  @@index([userId])
+}
+
+model Position {
+  id            String @id @default(cuid())
+  userId        String
+  mint          String
+  qty           Float  @default(0)
+  avgEntryPrice Float  @default(0)
+  realizedPnl   Float  @default(0)
+  user          User   @relation(fields: [userId], references: [id])
+
+  @@unique([userId, mint])
+  @@index([userId])
+  @@index([mint])
+}
+
+model Trade {
+  id        String   @id @default(cuid())
+  userId    String
+  mint      String
+  side      String
+  qty       Float
+  price     Float
+  fee       Float
+  slippage  Float
+  timestamp DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([mint])
+  @@index([timestamp])
+}
+
+model LimitOrder {
+  id               String   @id @default(cuid())
+  userId           String
+  mint             String
+  side             String   // "buy" | "sell"
+  orderType        String   // "limit" | "stop_loss" | "take_profit"
+  qty              Float
+  triggerPrice     Float
+  triggerType      String   @default("price") // "price" | "pnl_percent" | "market_cap"
+  triggerPnlPercent Float?  // e.g. 20 for +20%, -10 for -10%
+  triggerMarketCap  Float?  // target market cap for market_cap mode
+  usdcAmount        Float?  // USDC amount for market_cap mode
+  status           String   @default("open") // "open" | "filled" | "cancelled"
+  note             String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  filledAt         DateTime?
+  filledPrice      Float?
+  user             User     @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([mint])
+  @@index([status])
+}
+
+model Token {
+  mint     String   @id
+  symbol   String
+  name     String
+  decimals Int      @default(9)
+  listedAt DateTime @default(now())
+
+  @@index([symbol])
+  @@index([name])
+}

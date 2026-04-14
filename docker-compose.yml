@@ -1,0 +1,70 @@
+version: "3.9"
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: paper
+      POSTGRES_PASSWORD: paper
+      POSTGRES_DB: paper_trading
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U paper -d paper_trading"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - "4000:4000"
+    environment:
+      DATABASE_URL: postgresql://paper:paper@postgres:5432/paper_trading
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: dev_secret_change_in_prod
+      JWT_EXPIRES_IN: 7d
+      BACKEND_PORT: 4000
+      BACKEND_HOST: 0.0.0.0
+      SOLANA_TRACKER_API_KEY: ${SOLANA_TRACKER_API_KEY}
+      SOLANA_TRACKER_BASE_URL: https://data.solanatracker.io
+      DEFAULT_PAPER_BALANCE: 10000
+      SLIPPAGE_MIN: 0.0005
+      SLIPPAGE_MAX: 0.003
+      TRADE_FEE: 0.001
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: >
+      sh -c "npx prisma migrate deploy && npx prisma db seed && node dist/server.js"
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      NEXT_PUBLIC_BACKEND_URL: http://backend:4000
+      NEXT_PUBLIC_WS_URL: ws://backend:4000
+    depends_on:
+      - backend
+
+volumes:
+  pgdata:
